@@ -36,6 +36,9 @@ class ItemMenu extends MovieClip
 	private var _sortColumnControls: Array;
 	private var _sortOrderControls: Object;
 
+	//Frostfall
+	private var _fetchedRanges: Array;
+	private var _fetchedChangeRanges: Array;
 
   /* STAGE ELEMENTS */
 
@@ -108,6 +111,12 @@ class ItemMenu extends MovieClip
 
 		itemCard.addEventListener("quantitySelect",this,"onQuantityMenuSelect");
 		itemCard.addEventListener("subMenuAction",this,"onItemCardSubMenuAction");
+
+		//Frostfall
+		_fetchedRanges = [];
+		_fetchedChangeRanges = [];
+		itemCard.currentList = inventoryLists.itemList.entryList;
+		//skse.Log("currentList " + itemCard.currentList);
 
 		positionFixedElements();
 
@@ -221,12 +230,30 @@ class ItemMenu extends MovieClip
 	// @API
 	public function UpdatePlayerInfo(aUpdateObj: Object): Void
 	{
+		//Frostfall
+		var selectedEntry = inventoryLists.itemList.selectedEntry;
+		if (selectedEntry !== undefined) {
+			aUpdateObj["warmth"] = selectedEntry.warmth;
+			aUpdateObj["coverage"] = selectedEntry.coverage;
+			aUpdateObj["currentArmorWarmth"] = selectedEntry.currentArmorWarmth;
+			aUpdateObj["currentArmorCoverage"] = selectedEntry.currentArmorCoverage;
+		}
+
 		bottomBar.UpdatePlayerInfo(aUpdateObj,itemCard.itemInfo);
 	}
 
 	// @API
 	public function UpdateItemCardInfo(aUpdateObj: Object): Void
 	{
+		//Frostfall
+		var selectedEntry = inventoryLists.itemList.selectedEntry;
+		if (selectedEntry !== undefined) {
+			aUpdateObj["warmth"] = selectedEntry.warmth;
+			aUpdateObj["coverage"] = selectedEntry.coverage;
+			aUpdateObj["currentArmorWarmth"] = selectedEntry.currentArmorWarmth;
+			aUpdateObj["currentArmorCoverage"] = selectedEntry.currentArmorCoverage;
+		}
+
 		itemCard.itemInfo = aUpdateObj;
 		bottomBar.updatePerItemInfo(aUpdateObj);
 	}
@@ -349,6 +376,23 @@ class ItemMenu extends MovieClip
 
 	private function onItemHighlightChange(event: Object): Void
 	{
+		//Frostfall
+		itemCard.currentListIndex = event.index;
+		var range = Math.floor(event.index / 5);
+		//skse.Log("Current range is " + range);
+		if (_fetchedRanges.indexOf(range) === -1 || _fetchedRanges.indexOf(range) === undefined) {
+			var rangeMin = range * 5;
+			var rangeMax = (range * 5) + 4;
+			FetchProtectionDataForList(event.target.itemList._entryList, rangeMin, rangeMax);
+			_fetchedRanges.push(range);
+		}
+		if (_fetchedChangeRanges.indexOf(range) === -1 || _fetchedChangeRanges.indexOf(range) === undefined) {
+			var rangeMin = range * 5;
+			var rangeMax = (range * 5) + 4;
+			FetchChangeDataForList(inventoryLists.itemList.entryList, rangeMin, rangeMax);
+			_fetchedChangeRanges.push(range);
+		}
+
 		if (event.index != -1) {
 			if (!_bItemCardFadedIn) {
 				_bItemCardFadedIn = true;
@@ -605,4 +649,131 @@ class ItemMenu extends MovieClip
 	}
 
 	private function updateBottomBar(a_bSelected: Boolean): Void {}
+
+	//Frostfall
+	public function FetchProtectionDataForList(entryList: Array, rangeMin: Number, rangeMax: Number): Void
+	{
+		for(var i = rangeMin; i <= rangeMax; i++) {
+			//skse.Log(idx + " : " + event.target.itemList._entryList[idx]);
+			var entry = entryList[i];
+			//skse.Log(idx + " : " + entry.formId);
+			if (entry.formType === 26) {
+				getEntryProtectionData(entry.text, i, Number(entry.formId));
+			};
+		};
+		//skse.Log("FormID: " + event.target.itemList.selectedEntry.formId);
+	}
+
+	public function FetchChangeDataForList(entryList: Array, rangeMin: Number, rangeMax: Number): Void
+	{
+		for(var i = rangeMin; i <= rangeMax; i++) {
+			//skse.Log(idx + " : " + event.target.itemList._entryList[idx]);
+			var entry = entryList[i];
+			//skse.Log(idx + " : " + entry.formId);
+			if (entry.formType === 26) {
+				getEntryChangeData(entry.text, i, Number(entry.formId));
+			};
+		};
+		//skse.Log("FormID: " + event.target.itemList.selectedEntry.formId);
+	}
+
+	public function setEntryProtectionData(/* values */): Void
+	{
+		var index:Number = arguments[0];
+		var warmth:Number = arguments[1];
+		var coverage:Number = arguments[2];
+		skse.Log("Receiving idx " + index + ", warmth " + warmth + ", coverage " + coverage);
+		var entry = inventoryLists.itemList.entryList[index];
+		entry["warmth"] = warmth;
+		entry["coverage"] = coverage;
+
+		var selectedEntry = inventoryLists.itemList.selectedEntry;
+		if (selectedEntry.formType === 26) {
+			var selectedIdx:Number = selectedEntry.itemIndex;
+			var entryFromSelected = inventoryLists.itemList.entryList[selectedIdx];
+			if (entryFromSelected["warmth"] !== undefined && entryFromSelected["coverage"] !== undefined) {
+				itemCard.ForceProtectionDisplay(entryFromSelected.warmth, entryFromSelected.coverage);
+
+				if (entryFromSelected["currentArmorWarmth"] !== undefined && entryFromSelected["currentArmorCoverage"] !== undefined) {
+					bottomBar.updateFrostfallValues(selectedEntry);
+					bottomBar.updateFrostfallElementPositions();
+				}
+			}
+		}
+		//skse.Log("Entry values are " + entry.warmth + " and " + entry.coverage);
+	}
+
+	public function setEntryChangeData(/* values */): Void
+	{
+		var index:Number = arguments[0];
+		var currentArmorWarmth:Number = arguments[1];
+		var currentArmorCoverage:Number = arguments[2];
+		// skse.Log("Receiving idx " + index + ", warmth " + warmth + ", coverage " + coverage);
+		var entry = inventoryLists.itemList.entryList[index];
+		entry["currentArmorWarmth"] = currentArmorWarmth;
+		entry["currentArmorCoverage"] = currentArmorCoverage;
+
+		var selectedEntry = inventoryLists.itemList.selectedEntry;
+		if (selectedEntry.formType === 26) {
+			var selectedIdx:Number = selectedEntry.itemIndex;
+			var entryFromSelected = inventoryLists.itemList.entryList[selectedIdx];
+			if (entryFromSelected["currentArmorWarmth"] !== undefined && entryFromSelected["currentArmorCoverage"] !== undefined) {
+				bottomBar.updateFrostfallValues(selectedEntry);
+				bottomBar.updateFrostfallElementPositions();
+			}
+		}
+	}
+
+	public function setEntryProtectionDataOnProcess(entryIndex: Number): Void
+	{
+		//skse.Log("setEntryProtectionDataOnProcess")
+		itemCard.currentListIndex = entryIndex;
+		var range = Math.floor(entryIndex / 5);
+		//skse.Log("Current range is " + range);
+		if (_fetchedRanges.indexOf(range) === -1 || _fetchedRanges.indexOf(range) === undefined) {
+			//skse.Log("Need to fetch range " + range);
+			var rangeMin = range * 5;
+			var rangeMax = (range * 5) + 4;
+			FetchProtectionDataForList(inventoryLists.itemList.entryList, rangeMin, rangeMax);
+			_fetchedRanges.push(range);
+		}
+	}
+
+	public function setEntryChangeDataOnProcess(entryIndex: Number): Void
+	{
+		itemCard.currentListIndex = entryIndex;
+		var range = Math.floor(entryIndex / 5);
+		//skse.Log("setEntryChangeDataOnProcess Current range is " + range);
+		if (_fetchedChangeRanges.indexOf(range) === -1 || _fetchedChangeRanges.indexOf(range) === undefined) {
+			//skse.Log("setEntryChangeDataOnProcess Need to fetch range " + range);
+			var rangeMin = range * 5;
+			var rangeMax = (range * 5) + 4;
+			FetchChangeDataForList(inventoryLists.itemList.entryList, rangeMin, rangeMax);
+			_fetchedChangeRanges.push(range);
+		}
+	}
+
+	private function getEntryProtectionData(entryName: String, entryIndex: Number, formId: Number): Void
+	{
+		//skse.Log("sending " + entryIndex + " and " + formId);
+		skse.SendModEvent("Frost_OnSkyUIInvListGetEntryProtectionData", entryName, entryIndex, formId);
+	}
+
+	private function getEntryChangeData(entryName: String, entryIndex: Number, formId: Number): Void
+	{
+		//skse.Log("sending " + entryIndex + " and " + formId);
+		skse.SendModEvent("Frost_OnSkyUIInvListGetEntryChangeData", entryName, entryIndex, formId);
+	}
+
+	public function onFrostfallInvalidateFetchedRangesOnProcess(): Void
+	{
+		_fetchedRanges = [];
+		setEntryProtectionDataOnProcess(inventoryLists.itemList.selectedIndex);
+	}
+
+	private function onFrostfallInvalidateChangeRanges(): Void
+	{
+		_fetchedChangeRanges = [];
+		setEntryChangeDataOnProcess(inventoryLists.itemList.selectedIndex);
+	}
 }

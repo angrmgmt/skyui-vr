@@ -14,6 +14,9 @@ class ItemcardDataExtender implements IListProcessor
 	private var _itemInfo: Object;
 	private var _requestItemInfo: Function;
 	
+	//Frostfall
+	private var _listProcessed: Boolean;
+
 	
   /* INITIALIZATION */
 	
@@ -39,6 +42,9 @@ class ItemcardDataExtender implements IListProcessor
   	// @override IListProcessor
 	public function processList(a_list: BasicList): Void
 	{
+		//Frostfall
+		_listProcessed = false;
+
 		var entryList = a_list.entryList;
 		
 		for (var i = 0; i < entryList.length; i++) {
@@ -55,6 +61,10 @@ class ItemcardDataExtender implements IListProcessor
 			_requestItemInfo.apply(a_list, [this, i]);
 			processEntry(e, _itemInfo);
 		}
+		
+		//Frostfall
+		_listProcessed = true;
+		skse.SendModEvent("Frost_InvalidateFetchedRangesOnProcess", "", 0, 0);
 	}
 
   /* PRIVATE FUNCTIONS */

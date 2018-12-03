@@ -6,6 +6,9 @@ import gfx.io.GameDelegate;
 import Components.DeltaMeter;
 import Shared.GlobalFunc;
 
+//Frostfall
+import skyui.components.list.TabularList;
+
 import skyui.defines.Inventory;
 import skyui.util.Debug;
 
@@ -43,6 +46,10 @@ class ItemCard extends MovieClip
 	var WeaponDamageValue: TextField;
 	var WeaponEnchantedLabel: TextField;
 
+	// Frostfall
+	var ExposureProtectionValue: TextField;
+	var RainProtectionValue: TextField;
+
 	var ButtonRect: MovieClip;
 	var ButtonRect_mc: MovieClip;
 	var CardList_mc: MovieClip;
@@ -69,8 +76,9 @@ class ItemCard extends MovieClip
 	var _bEditNameMode: Boolean;
 	var bFadedIn: Boolean;
 
-	//var LastShoutObj: Object;
-
+	//Frostfall
+	public var currentList: TabularList;
+	public var currentListIndex: Number;
 
 	function ItemCard()
 	{
@@ -215,6 +223,11 @@ class ItemCard extends MovieClip
 				ApparelEnchantedLabel.textAutoSize = "shrink";
 				ApparelEnchantedLabel.SetText(aUpdateObj.effects, true);
 				SkillTextInstance.SetText(aUpdateObj.skillText);
+
+				//Frostfall
+				skse.Log("warmth " + currentList[currentListIndex].warmth + " coverage " + currentList[currentListIndex].coverage);
+				ExposureProtectionValue.text = currentList[currentListIndex].warmth === undefined ? "" : currentList[currentListIndex].warmth;
+				RainProtectionValue.text = currentList[currentListIndex].coverage === undefined ? "" : currentList[currentListIndex].coverage;
 				break;
 
 			case Inventory.ICT_WEAPON:
@@ -762,6 +775,13 @@ class ItemCard extends MovieClip
 	function onListSelectionChange(event: Object): Void
 	{
 		ItemCardMeters[Inventory.ICT_LIST].SetDeltaPercent(ItemList.selectedEntry.chargeAdded + LastUpdateObj.currentCharge);
+	}
+
+	// Frostfall
+	public function ForceProtectionDisplay(warmth: Number, coverage: Number): Void
+	{
+		ExposureProtectionValue.text = currentList[currentListIndex].warmth === undefined ? "" : currentList[currentListIndex].warmth;
+		RainProtectionValue.text = currentList[currentListIndex].coverage === undefined ? "" : currentList[currentListIndex].coverage;
 	}
 
 }
