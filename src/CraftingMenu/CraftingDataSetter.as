@@ -442,6 +442,23 @@ class CraftingDataSetter implements IListProcessor
 			}
 		}
 
+		// List parts/slots it occupies
+		if(a_entryObject.partMask != 0) {
+			var slots = [];
+			var mask = 1;
+			var bitnum = 1;
+			while(mask != 0)
+			{
+				if(a_entryObject.partMask & mask)
+				{
+					slots.push(bitnum + 29);
+				}
+				mask = mask << 1;
+				bitnum = bitnum + 1;
+			}
+			a_entryObject.bipedSlotsDisplay = slots.join(",");
+		}
+
 		if (a_entryObject.mainPartMask == undefined)
 			return;
 
