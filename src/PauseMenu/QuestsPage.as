@@ -4,6 +4,7 @@ import gfx.ui.InputDetails;
 import Shared.GlobalFunc;
 import gfx.ui.NavigationCode;
 import gfx.managers.FocusHandler;
+import skyui.util.Debug;
 
 class QuestsPage extends MovieClip
 {
