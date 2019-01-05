@@ -1,556 +1,640 @@
+﻿import gfx.events.EventDispatcher;
+
+import skyui.components.list.ColumnLayoutData;
+import skyui.components.list.ColumnDescriptor;
+import skyui.util.GlobalFunctions;
+
+
+/*
+ *  Encapsulates the list layout configuration.
+ */
 class skyui.components.list.ListLayout
 {
-   static var MAX_TEXTFIELD_INDEX = 10;
-   static var LEFT = 0;
-   static var RIGHT = 1;
-   static var TOP = 2;
-   static var BOTTOM = 3;
-   static var COL_TYPE_ITEM_ICON = 0;
-   static var COL_TYPE_EQUIP_ICON = 1;
-   static var COL_TYPE_TEXT = 2;
-   static var COL_TYPE_NAME = 3;
-   var _activeViewIndex = -1;
-   var _lastViewIndex = -1;
-   var _lastFilterFlag = -1;
-   var _activeColumnIndex = -1;
-   var _activeColumnState = 1;
-   var _layoutUpdateCount = 1;
-   function ListLayout(a_layoutData, a_viewData, a_columnData, a_defaultsData)
-   {
-      skyui.util.GlobalFunctions.addArrayFunctions();
-      gfx.events.EventDispatcher.initialize(this);
-      this._prefData = {column:null,stateIndex:1};
-      this._viewList = [];
-      this._columnList = [];
-      this._columnLayoutData = [];
-      this._hiddenStageNames = [];
-      this._columnDescriptors = [];
-      this._layoutData = a_layoutData;
-      this._viewData = a_viewData;
-      this._columnData = a_columnData;
-      this._defaultsData = a_defaultsData;
-      if(this._entryWidth == undefined)
-      {
-         this._entryWidth = this._defaultsData.entryWidth;
-      }
-      this.updateViewList();
-      this.updateColumnList();
-      this._defaultEntryTextFormat = new TextFormat();
-      this._defaultLabelTextFormat = new TextFormat();
-      for(var _loc2_ in this._defaultsData.entry.textFormat)
-      {
-         if(this._defaultEntryTextFormat.hasOwnProperty(_loc2_))
-         {
-            this._defaultEntryTextFormat[_loc2_] = this._defaultsData.entry.textFormat[_loc2_];
-         }
-      }
-      for(var _loc2_ in this._defaultsData.label.textFormat)
-      {
-         if(this._defaultLabelTextFormat.hasOwnProperty(_loc2_))
-         {
-            this._defaultLabelTextFormat[_loc2_] = this._defaultsData.label.textFormat[_loc2_];
-         }
-      }
-   }
-   function __get__currentView()
-   {
-      return this._viewList[this._activeViewIndex];
-   }
-   function __get__activeColumnIndex()
-   {
-      return this._activeColumnIndex;
-   }
-   function __get__columnCount()
-   {
-      return this._columnLayoutData.length;
-   }
-   function __get__activeColumnState()
-   {
-      return this._activeColumnState;
-   }
-   function __get__columnLayoutData()
-   {
-      return this._columnLayoutData;
-   }
-   function __get__hiddenStageNames()
-   {
-      return this._hiddenStageNames;
-   }
-   function __get__entryWidth()
-   {
-      return this._entryWidth;
-   }
-   function __set__entryWidth(a_width)
-   {
-      this._entryWidth = a_width;
-      return this.__get__entryWidth();
-   }
-   function __get__entryHeight()
-   {
-      return this._entryHeight;
-   }
-   function __get__layoutUpdateCount()
-   {
-      return this._layoutUpdateCount;
-   }
-   function __get__columnDescriptors()
-   {
-      return this._columnDescriptors;
-   }
-   function __get__sortOptions()
-   {
-      return this._sortOptions;
-   }
-   function __get__sortAttributes()
-   {
-      return this._sortAttributes;
-   }
-   function refresh()
-   {
-      this.updateViewList();
-      this._lastViewIndex = -1;
-      this.changeFilterFlag(this._lastFilterFlag);
-   }
-   function changeFilterFlag(a_flag)
-   {
-      this._lastFilterFlag = a_flag;
-      var _loc2_ = 0;
-      while(_loc2_ < this._viewList.length)
-      {
-         var _loc3_ = !(this._viewList[_loc2_].category instanceof Array)?[this._viewList[_loc2_].category]:this._viewList[_loc2_].category;
-         if(_loc3_.indexOf(a_flag) != undefined || _loc2_ == this._viewList.length - 1)
-         {
-            this._activeViewIndex = _loc2_;
-            break;
-         }
-         _loc2_ = _loc2_ + 1;
-      }
-      if(this._activeViewIndex == -1 || this._lastViewIndex == this._activeViewIndex)
-      {
-         return undefined;
-      }
-      this._lastViewIndex = this._activeViewIndex;
-      this.updateColumnList();
-      if(!this.restorePrefState())
-      {
-         this._activeColumnIndex = this.__get__currentView().columns.indexOf(this.__get__currentView().primaryColumn);
-         if(this._activeColumnIndex == undefined)
-         {
-            this._activeColumnIndex = 0;
-         }
-         this._activeColumnState = 1;
-      }
-      this.updateLayout();
-   }
-   function selectColumn(a_index)
-   {
-      var _loc3_ = this.toColumnListIndex(a_index);
-      var _loc2_ = this._columnList[_loc3_];
-      if(_loc2_ == null || _loc2_.passive)
-      {
-         return undefined;
-      }
-      if(this._activeColumnIndex != a_index)
-      {
-         this._activeColumnIndex = a_index;
-         this._activeColumnState = 1;
-      }
-      else if(this._activeColumnState < _loc2_.states)
-      {
-         this._activeColumnState = this._activeColumnState + 1;
-      }
-      else
-      {
-         this._activeColumnState = 1;
-      }
-      this._prefData.column = _loc2_;
-      this._prefData.stateIndex = this._activeColumnState;
-      this.updateLayout();
-   }
-   function nextColumn()
-   {
-      var _loc2_ = this._activeColumnIndex + 1;
-      var _loc3_ = this.toColumnListIndex(_loc2_);
-      if(_loc3_ == -1)
-      {
-         this.selectColumn(1);
-      }
-      else
-      {
-         this.selectColumn(_loc2_);
-      }
-   }
-   function nextActiveColumnState()
-   {
-      this.selectColumn(this.__get__activeColumnIndex());
-   }
-   function restoreColumnState(a_activeIndex, a_activeState)
-   {
-      var _loc3_ = this.toColumnListIndex(a_activeIndex);
-      var _loc2_ = this._columnList[_loc3_];
-      if(_loc2_ == null || _loc2_.passive)
-      {
-         return undefined;
-      }
-      if(a_activeState < 1 || a_activeState > _loc2_.states)
-      {
-         return undefined;
-      }
-      this._activeColumnIndex = a_activeIndex;
-      this._activeColumnState = a_activeState;
-      this._prefData.column = _loc2_;
-      this._prefData.stateIndex = this._activeColumnState;
-      this.updateLayout();
-   }
-   function updateLayout()
-   {
-      this._layoutUpdateCount = this._layoutUpdateCount + 1;
-      var _loc14_ = 0;
-      var _loc12_ = 0;
-      this._hiddenStageNames.splice(0);
-      this._columnLayoutData.splice(0);
-      var _loc9_ = 0;
-      var _loc10_ = 0;
-      var _loc13_ = 0;
-      while(_loc10_ < this._columnList.length)
-      {
-         var _loc3_ = this._columnList[_loc10_];
-         if(_loc3_.hidden != true)
-         {
-            var _loc2_ = new skyui.components.list.ColumnLayoutData();
-            this._columnLayoutData[_loc13_] = _loc2_;
-            var _loc6_ = undefined;
-            if(_loc13_ == this._activeColumnIndex)
-            {
-               _loc6_ = _loc3_["state" + this._activeColumnState];
-               this.updateSortParams(_loc6_);
-            }
-            else
-            {
-               _loc6_ = _loc3_.state1;
-            }
-            _loc2_.type = _loc3_.type;
-            _loc2_.labelArrowDown = !_loc6_.label.arrowDown?false:true;
-            _loc2_.labelValue = _loc6_.label.text;
-            _loc2_.entryValue = _loc6_.entry.text;
-            _loc2_.colorAttribute = _loc6_.colorAttribute;
-            _loc13_ = _loc13_ + 1;
-         }
-         _loc10_ = _loc10_ + 1;
-      }
-      var _loc7_ = this._entryWidth - 12;
-      var _loc11_ = 0;
-      var _loc17_ = false;
-      var _loc16_ = false;
-      _loc10_ = 0;
-      _loc13_ = 0;
-      while(_loc10_ < this._columnList.length)
-      {
-         _loc3_ = this._columnList[_loc10_];
-         if(_loc3_.hidden != true)
-         {
-            _loc13_;
-            _loc2_ = this._columnLayoutData[_loc13_++];
-            if(_loc3_.weight != undefined)
-            {
-               _loc11_ = _loc11_ + _loc3_.weight;
-               _loc9_ = (_loc9_ | 1) << 1;
-            }
-            else
-            {
-               _loc9_ = (_loc9_ | 0) << 1;
-            }
-            if(_loc3_.indent != undefined)
-            {
-               _loc7_ = _loc7_ - _loc3_.indent;
-            }
-            var _loc8_ = 0;
-            switch(_loc3_.type)
-            {
-               case skyui.components.list.ListLayout.COL_TYPE_ITEM_ICON:
-               case skyui.components.list.ListLayout.COL_TYPE_EQUIP_ICON:
-                  if(_loc3_.type == skyui.components.list.ListLayout.COL_TYPE_ITEM_ICON)
-                  {
-                     _loc2_.stageName = "itemIcon";
-                     _loc17_ = true;
-                  }
-                  else
-                  {
-                     _loc2_.stageName = "equipIcon";
-                     _loc16_ = true;
-                  }
-                  this._columnLayoutData[_loc10_].height = _loc0_ = _loc3_.icon.size;
-                  _loc2_.width = _loc0_;
-                  _loc7_ = _loc7_ - _loc3_.icon.size;
-                  _loc8_ = _loc8_ + _loc3_.icon.size;
-                  break;
-               default:
-                  _loc12_;
-                  _loc2_.stageName = "textField" + _loc12_++;
-                  if(_loc3_.width != undefined)
-                  {
-                     _loc2_.width = _loc3_.width >= 1?_loc3_.width:_loc3_.width * this._entryWidth;
-                     _loc7_ = _loc7_ - _loc2_.width;
-                  }
-                  else
-                  {
-                     _loc2_.width = 0;
-                  }
-                  if(_loc3_.height != undefined)
-                  {
-                     _loc2_.height = _loc3_.height >= 1?_loc3_.height:_loc3_.height * this._entryWidth;
-                  }
-                  else
-                  {
-                     _loc2_.height = 0;
-                  }
-                  if(_loc3_.entry.textFormat != undefined)
-                  {
-                     var _loc4_ = new TextFormat();
-                     for(var _loc15_ in this._defaultEntryTextFormat)
-                     {
-                        _loc4_[_loc15_] = this._defaultEntryTextFormat[_loc15_];
-                     }
-                     for(var _loc15_ in _loc3_.entry.textFormat)
-                     {
-                        if(_loc4_.hasOwnProperty(_loc15_))
-                        {
-                           _loc4_[_loc15_] = _loc3_.entry.textFormat[_loc15_];
-                        }
-                     }
-                     _loc2_.textFormat = _loc4_;
-                  }
-                  else
-                  {
-                     _loc2_.textFormat = this._defaultEntryTextFormat;
-                  }
-                  if(_loc3_.label.textFormat != undefined)
-                  {
-                     _loc4_ = new TextFormat();
-                     for(var _loc15_ in this._defaultLabelTextFormat)
-                     {
-                        _loc4_[_loc15_] = this._defaultLabelTextFormat[_loc15_];
-                     }
-                     for(var _loc15_ in _loc3_.label.textFormat)
-                     {
-                        if(_loc4_.hasOwnProperty(_loc15_))
-                        {
-                           _loc4_[_loc15_] = _loc3_.label.textFormat[_loc15_];
-                        }
-                     }
-                     _loc2_.labelTextFormat = _loc4_;
-                     break;
-                  }
-                  _loc2_.labelTextFormat = this._defaultLabelTextFormat;
-                  break;
-            }
-            if(_loc3_.border != undefined)
-            {
-               _loc7_ = _loc7_ - (_loc3_.border[skyui.components.list.ListLayout.LEFT] + _loc3_.border[skyui.components.list.ListLayout.RIGHT]);
-               _loc8_ = _loc8_ + (_loc3_.border[skyui.components.list.ListLayout.TOP] + _loc3_.border[skyui.components.list.ListLayout.BOTTOM]);
-               _loc2_.y = _loc3_.border[skyui.components.list.ListLayout.TOP];
-            }
-            else
-            {
-               _loc2_.y = 0;
-            }
-            if(_loc8_ > _loc14_)
-            {
-               _loc14_ = _loc8_;
-            }
-         }
-         _loc10_ = _loc10_ + 1;
-      }
-      if(_loc11_ > 0 && _loc7_ > 0 && _loc9_ != 0)
-      {
-         _loc10_ = this._columnList.length - 1;
-         _loc13_ = this._columnLayoutData.length - 1;
-         while(_loc10_ >= 0)
-         {
-            _loc3_ = this._columnList[_loc10_];
-            if(_loc3_.hidden != true)
-            {
-               _loc13_;
-               _loc2_ = this._columnLayoutData[_loc13_--];
-               if((_loc9_ = _loc9_ >>> 1) & 1)
-               {
-                  if(_loc3_.border != undefined)
-                  {
-                     _loc2_.width = _loc2_.width + (_loc3_.weight / _loc11_ * _loc7_ - _loc3_.border[skyui.components.list.ListLayout.LEFT] - _loc3_.border[skyui.components.list.ListLayout.RIGHT]);
-                  }
-                  else
-                  {
-                     _loc2_.width = _loc2_.width + _loc3_.weight / _loc11_ * _loc7_;
-                  }
-               }
-            }
-            _loc10_ = _loc10_ - 1;
-         }
-      }
-      var _loc5_ = 0;
-      _loc10_ = 0;
-      _loc13_ = 0;
-      while(_loc10_ < this._columnList.length)
-      {
-         _loc3_ = this._columnList[_loc10_];
-         if(_loc3_.hidden != true)
-         {
-            _loc13_;
-            _loc2_ = this._columnLayoutData[_loc13_++];
-            if(_loc3_.indent != undefined)
-            {
-               _loc5_ = _loc5_ + _loc3_.indent;
-            }
-            _loc2_.labelX = _loc5_;
-            if(_loc3_.border != undefined)
-            {
-               _loc2_.labelWidth = _loc2_.width + _loc3_.border[skyui.components.list.ListLayout.LEFT] + _loc3_.border[skyui.components.list.ListLayout.RIGHT];
-               _loc2_.x = _loc5_;
-               _loc5_ = _loc5_ + _loc3_.border[skyui.components.list.ListLayout.LEFT];
-               _loc2_.x = _loc5_;
-               _loc5_ = _loc5_ + (_loc3_.border[skyui.components.list.ListLayout.RIGHT] + _loc2_.width);
-            }
-            else
-            {
-               _loc2_.labelWidth = _loc2_.width;
-               _loc2_.x = _loc5_;
-               _loc5_ = _loc5_ + _loc2_.width;
-            }
-         }
-         _loc10_ = _loc10_ + 1;
-      }
-      while(_loc12_ < skyui.components.list.ListLayout.MAX_TEXTFIELD_INDEX)
-      {
-         _loc12_;
-         this._hiddenStageNames.push("textField" + _loc12_++);
-      }
-      if(!_loc17_)
-      {
-         this._hiddenStageNames.push("itemIcon");
-      }
-      if(!_loc16_)
-      {
-         this._hiddenStageNames.push("equipIcon");
-      }
-      this._entryHeight = _loc14_;
-      this.dispatchEvent({type:"layoutChange"});
-   }
-   function updateSortParams(stateData)
-   {
-      var _loc2_ = stateData.sortAttributes;
-      var _loc3_ = stateData.sortOptions;
-      if(!_loc3_)
-      {
-         this._sortOptions = null;
-         this._sortAttributes = null;
-         return undefined;
-      }
-      if(!_loc2_)
-      {
-         if(stateData.entry.text.charAt(0) == "@")
-         {
-            _loc2_ = [stateData.entry.text.slice(1)];
-         }
-      }
-      if(!_loc2_)
-      {
-         this._sortOptions = null;
-         this._sortAttributes = null;
-         return undefined;
-      }
-      if(!(_loc2_ instanceof Array))
-      {
-         _loc2_ = [_loc2_];
-      }
-      if(!(_loc3_ instanceof Array))
-      {
-         _loc3_ = [_loc3_];
-      }
-      this._sortOptions = _loc3_;
-      this._sortAttributes = _loc2_;
-   }
-   function restorePrefState()
-   {
-      if(!this._prefData.column)
-      {
-         return false;
-      }
-      var _loc3_ = this._columnList.indexOf(this._prefData.column);
-      var _loc2_ = this.toColumnLayoutDataIndex(_loc3_);
-      if(_loc3_ > -1 && _loc2_ > -1)
-      {
-         this._activeColumnIndex = _loc2_;
-         this._activeColumnState = this._prefData.stateIndex;
-         return true;
-      }
-      this._prefData.column = null;
-      this._prefData.stateIndex = 1;
-      return false;
-   }
-   function toColumnListIndex(a_index)
-   {
-      var _loc2_ = 0;
-      var _loc3_ = 0;
-      while(_loc2_ < this._columnList.length)
-      {
-         if(this._columnList[_loc2_].hidden != true)
-         {
-            if(_loc3_ == a_index)
-            {
-               return _loc2_;
-            }
-            _loc3_ = _loc3_ + 1;
-         }
-         _loc2_ = _loc2_ + 1;
-      }
-      return -1;
-   }
-   function toColumnLayoutDataIndex(a_index)
-   {
-      var _loc2_ = 0;
-      var _loc3_ = 0;
-      while(_loc2_ < this._columnList.length)
-      {
-         if(this._columnList[_loc2_].hidden != true)
-         {
-            if(_loc2_ == a_index)
-            {
-               return _loc3_;
-            }
-            _loc3_ = _loc3_ + 1;
-         }
-         _loc2_ = _loc2_ + 1;
-      }
-      return -1;
-   }
-   function updateViewList()
-   {
-      this._viewList.splice(0);
-      var _loc3_ = this._layoutData.views;
-      var _loc2_ = 0;
-      while(_loc2_ < _loc3_.length)
-      {
-         this._viewList.push(this._viewData[_loc3_[_loc2_]]);
-         _loc2_ = _loc2_ + 1;
-      }
-   }
-   function updateColumnList()
-   {
-      this._columnList.splice(0);
-      this._columnDescriptors.splice(0);
-      var _loc5_ = this.__get__currentView().columns;
-      var _loc3_ = 0;
-      while(_loc3_ < _loc5_.length)
-      {
-         var _loc4_ = this._columnData[_loc5_[_loc3_]];
-         var _loc2_ = new skyui.components.list.ColumnDescriptor();
-         _loc2_.hidden = _loc4_.hidden;
-         _loc2_.identifier = _loc5_[_loc3_];
-         _loc2_.longName = _loc4_.name;
-         _loc2_.type = _loc4_.type;
-         this._columnList.push(_loc4_);
-         this._columnDescriptors.push(_loc2_);
-         _loc3_ = _loc3_ + 1;
-      }
-   }
+  /* CONSTANTS */
+  
+	private static var MAX_TEXTFIELD_INDEX = 10;
+	
+	private static var LEFT = 0;
+	private static var RIGHT = 1;
+	private static var TOP = 2;
+	private static var BOTTOM = 3;
+  
+	public static var COL_TYPE_ITEM_ICON = 0;
+	public static var COL_TYPE_EQUIP_ICON = 1;
+	public static var COL_TYPE_TEXT = 2;
+	public static var COL_TYPE_NAME = 3;
+	
+	
+  /* PRIVATE VARIABLES */
+  
+	private var _activeViewIndex: Number = -1;
+		
+	private var _layoutData: Object;
+	private var _viewData: Object;
+	private var _columnData: Object;
+	private var _defaultsData: Object;
+
+	private var _lastViewIndex: Number = -1;
+	
+	// viewIndex, columnIndex, stateIndex
+	private var _prefData: Object;
+	
+	private var _stateData: Object;
+	
+	private var _defaultEntryTextFormat: TextFormat;
+	private var _defaultLabelTextFormat: TextFormat;
+	
+	// List of views in this layout (updated only when the config changes)
+	private var _viewList: Array;
+	
+	// List of columns for the current view (updated when the view changes
+	private var _columnList: Array;
+	
+	private var _lastFilterFlag: Number = -1;
+	
+	
+  /* PROPERTIES */
+	
+	public function get currentView(): Object
+	{
+		return _viewList[_activeViewIndex];
+	}
+	
+	private var _activeColumnIndex: Number = -1;
+	
+	public function get activeColumnIndex(): Number
+	{
+		return _activeColumnIndex;
+	}
+	
+	public function get columnCount(): Number
+	{
+		return _columnLayoutData.length;
+	}
+	
+	private var _activeColumnState: Number = 1;
+
+	public function get activeColumnState(): Number
+	{
+		return _activeColumnState;
+	}
+	
+	private var _columnLayoutData: Array;
+	
+	public function get columnLayoutData(): Array
+	{
+		return _columnLayoutData;
+	}
+	
+	private var _hiddenStageNames: Array;
+	
+	public function get hiddenStageNames(): Array
+	{
+		return _hiddenStageNames;
+	}
+	
+	private var _entryWidth: Number;
+	
+	public function get entryWidth(): Number
+	{
+		return _entryWidth;
+	}
+	
+	public function set entryWidth(a_width: Number): Void
+	{
+		_entryWidth = a_width;
+	}
+
+	private var _entryHeight: Number;
+
+	public function get entryHeight(): Number
+	{
+		return _entryHeight;
+	}
+	
+	private var _layoutUpdateCount: Number = 1;
+	
+	public function get layoutUpdateCount(): Number
+	{
+		return _layoutUpdateCount;
+	}
+	
+	private var _columnDescriptors: Array;
+	
+	public function get columnDescriptors(): Array
+	{
+		return _columnDescriptors;
+	}
+	
+	private var _sortOptions: Array;
+	
+	public function get sortOptions(): Array
+	{
+		return _sortOptions;
+	}
+	
+	private var _sortAttributes: Array;
+	
+	public function get sortAttributes(): Array
+	{
+		return _sortAttributes;
+	}
+	
+	
+  /* INITIALIZATION */
+	
+	public function ListLayout(a_layoutData: Object, a_viewData: Object, a_columnData: Object, a_defaultsData: Object)
+	{
+		GlobalFunctions.addArrayFunctions();
+		
+		EventDispatcher.initialize(this);
+		
+		_prefData = {column: null, stateIndex: 1};
+		_viewList = [];
+		_columnList = [];
+		_columnLayoutData = [];
+		_hiddenStageNames = [];
+		_columnDescriptors = [];
+		
+		_layoutData = a_layoutData;
+		_viewData = a_viewData;
+		_columnData = a_columnData;
+		_defaultsData = a_defaultsData;
+
+		if (_entryWidth == undefined)
+			_entryWidth = _defaultsData.entryWidth;
+		
+		updateViewList();
+		updateColumnList();
+		
+		// Initial textformats
+		_defaultEntryTextFormat = new TextFormat(); 
+		_defaultLabelTextFormat = new TextFormat();
+		
+		// Copy default textformat values from config
+		for (var prop in _defaultsData.entry.textFormat)
+			if (_defaultEntryTextFormat.hasOwnProperty(prop))
+				_defaultEntryTextFormat[prop] = _defaultsData.entry.textFormat[prop];
+		
+		for (var prop in _defaultsData.label.textFormat)
+			if (_defaultLabelTextFormat.hasOwnProperty(prop))
+				_defaultLabelTextFormat[prop] = _defaultsData.label.textFormat[prop];
+	}
+	
+	
+  /* PUBLIC FUNCTIONS */
+  
+	// @mixin by gfx.events.EventDispatcher
+	public var dispatchEvent: Function;
+	public var dispatchQueue: Function;
+	public var hasEventListener: Function;
+	public var addEventListener: Function;
+	public var removeEventListener: Function;
+	public var removeAllEventListeners: Function;
+	public var cleanUpEvents: Function;
+	
+	public function refresh(): Void
+	{
+		updateViewList();
+		_lastViewIndex = -1;
+		changeFilterFlag(_lastFilterFlag);
+	}
+	
+	public function changeFilterFlag(a_flag: Number): Void
+	{
+		_lastFilterFlag = a_flag;
+		
+		// Find a matching view, or use last index
+		for (var i = 0; i < _viewList.length; i++) {
+			
+			// Wrap in array for single category
+			var categories = ((_viewList[i].category) instanceof Array) ? _viewList[i].category : [_viewList[i].category];
+			
+			if (categories.indexOf(a_flag) != undefined || i == _viewList.length-1) {
+				_activeViewIndex = i;
+				break;
+			}
+		}
+		
+		if (_activeViewIndex == -1 || _lastViewIndex == _activeViewIndex)
+			return;
+		
+		_lastViewIndex = _activeViewIndex;
+		
+		// Do this before restoring the pref state!
+		updateColumnList();
+		
+		// Restoring a previous state was not necessary or failed? Then use default
+		if (! restorePrefState()) {
+			_activeColumnIndex = currentView.columns.indexOf(currentView.primaryColumn);
+			if (_activeColumnIndex == undefined)
+				_activeColumnIndex = 0;
+				
+			_activeColumnState = 1;
+		}
+
+		updateLayout();
+	}
+	
+	public function selectColumn(a_index: Number): Void
+	{
+		var listIndex = toColumnListIndex(a_index);
+		var col = _columnList[listIndex];
+		
+		// Invalid column
+		if (col == null || col.passive)
+			return;
+			
+		if (_activeColumnIndex != a_index) {
+			_activeColumnIndex = a_index;
+			_activeColumnState = 1;
+		} else {
+			if (_activeColumnState < col.states)
+				_activeColumnState++;
+			else
+				_activeColumnState = 1;
+		}
+		
+		// Save as preferred state
+		_prefData.column = col;
+		_prefData.stateIndex = _activeColumnState;
+			
+		updateLayout();
+	}
+
+	public function nextColumn(): Void
+	{
+		// What's the next column we want to get to?
+		var nextIndex = _activeColumnIndex + 1;
+
+		var listIndex = toColumnListIndex(nextIndex);
+		if(listIndex == -1) {
+			// If we're trying to reach an invalid column by index,
+			// activate the first column instead
+			selectColumn(1);
+		} else {
+			selectColumn(nextIndex);
+		}
+	}
+
+	public function nextActiveColumnState(): Void
+	{
+		selectColumn(activeColumnIndex);
+	}
+
+	public function restoreColumnState(a_activeIndex: Number, a_activeState: Number): Void
+	{
+		var listIndex = toColumnListIndex(a_activeIndex);
+		var col = _columnList[listIndex];
+		
+		// Invalid column
+		if (col == null || col.passive)
+			return;
+
+		if (a_activeState < 1 || a_activeState > col.states)
+			return;
+		
+		_activeColumnIndex = a_activeIndex;
+		_activeColumnState = a_activeState;
+		
+		// Save as preferred state
+		_prefData.column = col;
+		_prefData.stateIndex = _activeColumnState;
+	
+		updateLayout();
+	}
+	
+
+  /* PRIVATE FUNCTIONS */
+	
+	private function updateLayout(): Void
+	{
+		_layoutUpdateCount++;
+
+		var maxHeight = 0;
+		var textFieldIndex = 0;
+
+		_hiddenStageNames.splice(0);
+		_columnLayoutData.splice(0);
+		
+		// Set bit at position i if column is weighted
+		var weightedFlags = 0;
+		
+		// Move some data from current state to root of the column so we can access single- and multi-state columns in the same manner.
+		// So this is a merge of defaults, column root and current state.
+		for (var i = 0, c = 0; i < _columnList.length; i++) {			
+			var col = _columnList[i];
+			// Skip
+			if (col.hidden == true)
+				continue;
+				
+			var columnLayoutData = new ColumnLayoutData();
+			_columnLayoutData[c] = columnLayoutData;
+				
+			// Non-active columns always use state 1
+			var stateData: Object;
+			if (c == _activeColumnIndex) {
+				stateData = col["state" + _activeColumnState];
+				updateSortParams(stateData);
+			} else {
+				stateData = col["state1"];
+			}
+				
+			columnLayoutData.type = col.type;
+			columnLayoutData.labelArrowDown = stateData.label.arrowDown ? true : false;
+			columnLayoutData.labelValue = stateData.label.text;
+			columnLayoutData.entryValue = stateData.entry.text;
+			columnLayoutData.colorAttribute = stateData.colorAttribute;
+			
+			c++;
+		}
+		
+		// Subtract arrow tip width
+		var weightedWidth = _entryWidth - 12;
+		
+		var weightSum = 0;
+
+		var bEnableItemIcon = false;
+		var bEnableEquipIcon = false;
+
+		for (var i = 0, c = 0; i < _columnList.length; i++) {
+			var col = _columnList[i];
+			// Skip
+			if (col.hidden == true)
+				continue;
+				
+			var columnLayoutData = _columnLayoutData[c++];
+
+			// Calc total weighted width and set weighted flags
+			if (col.weight != undefined) {
+				weightSum += col.weight;
+				weightedFlags = (weightedFlags | 1) << 1;
+			} else {
+				weightedFlags = (weightedFlags | 0) << 1;
+			}
+			
+			if (col.indent != undefined)
+				weightedWidth -= col.indent;
+			
+			// Height including borders for maxHeight
+			var curHeight = 0;
+			
+			switch (col.type) {
+				// ITEM ICON + EQUIP ICON
+				case ListLayout.COL_TYPE_ITEM_ICON:
+				case ListLayout.COL_TYPE_EQUIP_ICON:
+								
+					if (col.type == ListLayout.COL_TYPE_ITEM_ICON) {
+						columnLayoutData.stageName = "itemIcon";
+						bEnableItemIcon = true;
+					} else {
+						columnLayoutData.stageName = "equipIcon";
+						bEnableEquipIcon = true;
+					}
+					
+					columnLayoutData.width = _columnLayoutData[i].height = col.icon.size;
+					weightedWidth -= col.icon.size;
+						
+					curHeight += col.icon.size;
+					
+					break;
+
+				// REST
+				default:
+					columnLayoutData.stageName = "textField" + textFieldIndex++;
+					
+					if (col.width != undefined) {
+						// Width >= 1 for absolute width, < 1 for percentage width
+						columnLayoutData.width = col.width < 1 ? (col.width * _entryWidth) : col.width;
+						weightedWidth -= columnLayoutData.width;
+					} else {
+						columnLayoutData.width = 0;
+					}
+					
+					if (col.height != undefined)
+						// Height >= 1 for absolute height, < 1 for percentage height
+						columnLayoutData.height = col.height < 1 ? (col.height * _entryWidth) : col.height;
+					else
+						columnLayoutData.height = 0;
+					
+					if (col.entry.textFormat != undefined) {
+						var customTextFormat = new TextFormat();
+
+						// First clone default format
+						for (var prop in _defaultEntryTextFormat)
+							customTextFormat[prop] = _defaultEntryTextFormat[prop];
+						
+						// Then override if necessary
+						for (var prop in col.entry.textFormat)
+							if (customTextFormat.hasOwnProperty(prop))
+								customTextFormat[prop] = col.entry.textFormat[prop];
+						
+						columnLayoutData.textFormat = customTextFormat;
+					} else {
+						columnLayoutData.textFormat = _defaultEntryTextFormat;
+					}
+					
+					if (col.label.textFormat != undefined) {
+						var customTextFormat = new TextFormat();
+
+						// First clone default format
+						for (var prop in _defaultLabelTextFormat)
+							customTextFormat[prop] = _defaultLabelTextFormat[prop];
+					
+						// Then override if necessary
+						for (var prop in col.label.textFormat)
+							if (customTextFormat.hasOwnProperty(prop))
+								customTextFormat[prop] = col.label.textFormat[prop];
+								
+						columnLayoutData.labelTextFormat = customTextFormat;
+					} else {
+						columnLayoutData.labelTextFormat = _defaultLabelTextFormat;
+					}
+			}
+			
+			if (col.border != undefined) {
+				weightedWidth -= col.border[LEFT] + col.border[RIGHT];
+				curHeight += col.border[TOP] + col.border[BOTTOM];
+				columnLayoutData.y = col.border[TOP];
+			} else {
+				columnLayoutData.y = 0;
+			}
+			
+			if (curHeight > maxHeight)
+				maxHeight = curHeight;
+		}
+		
+		// Calculate the widths
+		if (weightSum > 0 && weightedWidth > 0 && weightedFlags != 0) {
+			for (var i = _columnList.length-1, c = _columnLayoutData.length-1; i >= 0; i--) {
+				var col = _columnList[i];
+				// Skip
+				if (col.hidden == true)
+					continue;
+					
+				var columnLayoutData = _columnLayoutData[c--];
+				
+				if ((weightedFlags >>>= 1) & 1) {
+					if (col.border != undefined)
+						columnLayoutData.width += ((col.weight / weightSum) * weightedWidth) - col.border[LEFT] - col.border[RIGHT];
+					else
+						columnLayoutData.width += (col.weight / weightSum) * weightedWidth;
+				}
+			}
+		}
+		
+		// Set x positions based on calculated widths, and set label data
+		var xPos = 0;
+		
+		for (var i=0, c=0; i<_columnList.length; i++) {
+			var col = _columnList[i];
+			// Skip
+			if (col.hidden == true)
+				continue;
+				
+			var columnLayoutData = _columnLayoutData[c++];
+			
+			if (col.indent != undefined)
+				xPos += col.indent;
+
+			columnLayoutData.labelX = xPos;
+
+			if (col.border != undefined) {
+				columnLayoutData.labelWidth = columnLayoutData.width + col.border[LEFT] + col.border[RIGHT];
+				columnLayoutData.x = xPos;
+				xPos += col.border[LEFT];
+				columnLayoutData.x = xPos;
+				xPos += col.border[RIGHT] + columnLayoutData.width;
+			} else {
+				columnLayoutData.labelWidth = columnLayoutData.width;
+				columnLayoutData.x = xPos;
+				xPos += columnLayoutData.width;
+			}
+		}
+		
+		while (textFieldIndex < MAX_TEXTFIELD_INDEX)
+			_hiddenStageNames.push("textField" + textFieldIndex++);
+		
+		if (!bEnableItemIcon)
+			_hiddenStageNames.push("itemIcon");
+		
+		if (!bEnableEquipIcon)
+			_hiddenStageNames.push("equipIcon");
+		
+		_entryHeight = maxHeight;
+		
+		// sortChange might not always trigger an update, so we have to make sure the list is updated,
+		// even if that means we update it twice.
+		dispatchEvent({type: "layoutChange"});
+	}
+	
+	private function updateSortParams(stateData: Object): Void
+	{
+		var sortAttributes = stateData.sortAttributes;
+		var sortOptions = stateData.sortOptions;
+		
+		if (!sortOptions) {
+			_sortOptions = null;
+			_sortAttributes = null;
+			return;
+		}
+		
+		// No attribute(s) set? Try to use entry value
+		if (!sortAttributes)
+			if (stateData.entry.text.charAt(0) == "@")
+				sortAttributes = [ stateData.entry.text.slice(1) ];
+		
+		if (!sortAttributes) {
+			_sortOptions = null;
+			_sortAttributes = null;
+			return;
+		}
+		
+		// Wrap single attribute in array
+		if (!(sortAttributes instanceof Array))
+			sortAttributes = [sortAttributes];
+			
+		if (!(sortOptions instanceof Array))
+			sortOptions = [sortOptions];
+			
+		_sortOptions = sortOptions;
+		_sortAttributes = sortAttributes;
+	}
+	
+	private function restorePrefState(): Boolean
+	{
+		// No preference to restore yet
+		if (!_prefData.column)
+			return false;
+
+		var listIndex = _columnList.indexOf(_prefData.column);
+		var layoutDataIndex = toColumnLayoutDataIndex(listIndex);
+
+		if (listIndex > -1 && layoutDataIndex > -1) {
+			_activeColumnIndex = layoutDataIndex;
+			_activeColumnState = _prefData.stateIndex;
+			return true;
+		}
+		
+		// Found no match, reset prefData and return false
+		_prefData.column = null;
+		_prefData.stateIndex = 1;
+		return false;
+	}
+	
+	// columnLayoutData index (no hidden columns) -> columnList index (all columns for this view)
+	private function toColumnListIndex(a_index): Number
+	{
+		for (var i = 0, c = 0; i < _columnList.length; i++) {
+			if (_columnList[i].hidden == true)
+				continue;
+			if (c == a_index)
+				return i;
+			c++;
+		}
+		
+		return -1;
+	}
+	
+	// columnList index (all columns for this view) -> columnLayoutData index (no hidden columns)
+	private function toColumnLayoutDataIndex(a_index): Number
+	{
+		for (var i = 0, c = 0; i < _columnList.length; i++) {
+			if (_columnList[i].hidden == true)
+				continue;
+			if (i == a_index)
+				return c;
+			c++;
+		}
+		
+		return -1;
+	}
+	
+	private function updateViewList(): Void
+	{
+		_viewList.splice(0);
+		var viewNames = _layoutData.views;
+		for (var i=0; i<viewNames.length; i++)
+			_viewList.push(_viewData[viewNames[i]]);
+	}
+	
+	private function updateColumnList(): Void
+	{
+		_columnList.splice(0);
+		_columnDescriptors.splice(0);
+		
+		var columnNames = currentView.columns;
+		
+		for (var i=0; i<columnNames.length; i++) {
+			var col = _columnData[columnNames[i]];
+			var cd : ColumnDescriptor = new ColumnDescriptor();
+			cd.hidden = col.hidden;
+			cd.identifier = columnNames[i];
+			cd.longName = col.name;
+			cd.type = col.type;
+			
+			_columnList.push(col);
+			_columnDescriptors.push(cd);
+		}
+	}
 }

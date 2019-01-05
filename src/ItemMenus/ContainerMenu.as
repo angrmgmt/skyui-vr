@@ -1,351 +1,473 @@
+﻿import gfx.io.GameDelegate;
+import gfx.ui.NavigationCode;
+import gfx.ui.InputDetails;
+
+import skyui.util.Translator;
+import skyui.util.GlobalFunctions;
+import skyui.components.list.ListLayoutManager;
+import skyui.components.list.TabularList;
+import skyui.components.list.ListLayout;
+import skyui.props.PropertyDataExtender;
+
+import skyui.defines.Input;
+import skyui.defines.Inventory;
+import skyui.defines.Item;
+
+import flash.utils.getTimer;
+
 class ContainerMenu extends ItemMenu
 {
-   static var SKYUI_RELEASE_IDX = 2018;
-   static var SKYUI_VERSION_MAJOR = 5;
-   static var SKYUI_VERSION_MINOR = 2;
-   static var SKYUI_VERSION_STRING = ContainerMenu.SKYUI_VERSION_MAJOR + "." + ContainerMenu.SKYUI_VERSION_MINOR + " SE";
-   static var NULL_HAND = -1;
-   static var RIGHT_HAND = 0;
-   static var LEFT_HAND = 1;
-   var _bEquipMode = false;
-   var bNPCMode = false;
-   var bEnableTabs = true;
-   function ContainerMenu()
-   {
-      super();
-      this._tabBarIconArt = ["take","give"];
-      this._pauseInputHandling = false;
-      this._columnOpRequested = 0;
-   }
-   function InitExtensions()
-   {
-      super.InitExtensions();
-      this.inventoryLists.__set__tabBarIconArt(this._tabBarIconArt);
-      this.inventoryLists.categoryList.iconArt = ["inv_all","inv_weapons","inv_armor","inv_potions","inv_scrolls","inv_food","inv_ingredients","inv_books","inv_keys","inv_misc"];
-      gfx.io.GameDelegate.addCallBack("AttemptEquip",this,"AttemptEquip");
-      gfx.io.GameDelegate.addCallBack("AttemptTake",this,"AttemptTake");
-      gfx.io.GameDelegate.addCallBack("AttemptTakeAll",this,"AttemptTakeAll");
-      gfx.io.GameDelegate.addCallBack("AttemptStore",this,"AttemptStore");
-      gfx.io.GameDelegate.addCallBack("AttemptTakeAndEquip",this,"AttemptTakeAndEquip");
-      gfx.io.GameDelegate.addCallBack("Vanilla_AttemptEquip",this,"Vanilla_AttemptEquip");
-      gfx.io.GameDelegate.addCallBack("Vanilla_XButtonPress",this,"Vanilla_XButtonPress");
-      this.itemCardFadeHolder.StealTextInstance._visible = false;
-   }
-   function setConfig(a_config)
-   {
-      super.setConfig(a_config);
-      var _loc3_ = this.inventoryLists.itemList;
-      _loc3_.addDataProcessor(new InventoryDataSetter());
-      _loc3_.addDataProcessor(new InventoryIconSetter(a_config.Appearance));
-      _loc3_.addDataProcessor(new skyui.props.PropertyDataExtender(a_config.Appearance,a_config.Properties,"itemProperties","itemIcons","itemCompoundProperties"));
-      var _loc5_ = skyui.components.list.ListLayoutManager.createLayout(a_config.ListLayout,"ItemListLayout");
-      _loc3_.__set__layout(_loc5_);
-      if(this.inventoryLists.categoryList.__get__selectedEntry())
-      {
-         _loc5_.changeFilterFlag(this.inventoryLists.categoryList.__get__selectedEntry().flag);
-      }
-      this._equipModeKey = a_config.Input.controls.pc.equipMode;
-      this._equipModeControls = {keyCode:this._equipModeKey};
-   }
-   function ShowItemsList()
-   {
-   }
-   function handleInput(details, pathToFocus)
-   {
-      if(this._pauseInputHandling)
-      {
-         return true;
-      }
-      skyui.util.Input.rateLimit(this,"_pauseInputHandling",10);
-      var _loc4_ = pathToFocus[0] != this.itemCard;
-      if(_loc4_ && Shared.GlobalFunc.IsKeyPressed(details) && details.navEquivalent == gfx.ui.NavigationCode.LEFT && this.inventoryLists.categoryList.selectionAtBeginningOfSegment())
-      {
-         if(!this._pauseTabSwitch)
-         {
-            this.inventoryLists.toggleTab();
-            skyui.util.Input.rateLimit(this,"_pauseTabSwitch",333.3333333333333);
-         }
-         return true;
-      }
-      super.handleInput(details,pathToFocus);
-      if(this.shouldProcessItemsListInput(false))
-      {
-         if((this._platform == Shared.Platforms.CONTROLLER_PC || this._platform == Shared.Platforms.CONTROLLER_VIVE || this._platform == Shared.Platforms.CONTROLLER_OCULUS || this._platform == Shared.Platforms.CONTROLLER_WINDOWS_MR) && details.skseKeycode == this._equipModeKey && this.inventoryLists.itemList.__get__selectedIndex() != -1)
-         {
-            this._bEquipMode = details.value != "keyUp";
-            this.updateBottomBar(true);
-         }
-      }
-      return true;
-   }
-   function UpdateItemCardInfo(a_updateObj)
-   {
-      super.UpdateItemCardInfo(a_updateObj);
-      this.updateBottomBar(true);
-      if(a_updateObj.pickpocketChance != undefined)
-      {
-         this.itemCardFadeHolder.StealTextInstance._visible = true;
-         this.itemCardFadeHolder.StealTextInstance.PercentTextInstance.html = true;
-         this.itemCardFadeHolder.StealTextInstance.PercentTextInstance.htmlText = "<font face=\'$EverywhereBoldFont\' size=\'24\' color=\'#FFFFFF\'>" + a_updateObj.pickpocketChance + "%</font>" + (!this.isViewingContainer()?skyui.util.Translator.translate("$ TO PLACE"):skyui.util.Translator.translate("$ TO STEAL"));
-      }
-      else
-      {
-         this.itemCardFadeHolder.StealTextInstance._visible = false;
-      }
-   }
-   function AttemptEquip(a_slot, a_bCheckOverList)
-   {
-   }
-   function SetPlatform(a_platform, a_bPS3Switch)
-   {
-      super.SetPlatform(a_platform,a_bPS3Switch);
-      this._bEquipMode = a_platform != 0;
-   }
-   function Vanilla_AttemptEquip(a_slot, a_bCheckOverList)
-   {
-      var _loc2_ = a_bCheckOverList != undefined?a_bCheckOverList:true;
-      if(!this.shouldProcessItemsListInput(_loc2_) || !this.confirmSelectedEntry())
-      {
-         return undefined;
-      }
-      if(this._platform == Shared.Platforms.CONTROLLER_PC || this._platform == Shared.Platforms.CONTROLLER_VIVE || this._platform == Shared.Platforms.CONTROLLER_OCULUS || this._platform == Shared.Platforms.CONTROLLER_WINDOWS_MR)
-      {
-         if(this._bEquipMode)
-         {
-            this.startItemEquip(a_slot);
-         }
-         else
-         {
-            this.startItemTransfer();
-         }
-      }
-      else
-      {
-         this.startItemEquip(a_slot);
-      }
-   }
-   function AttemptTake(abCheckOverList)
-   {
-      var _loc2_ = abCheckOverList != undefined?abCheckOverList:true;
-      if(this.shouldProcessItemsListInput(_loc2_))
-      {
-         this.startItemTransfer();
-      }
-   }
-   function AttemptTakeAndEquip(aiSlot, abCheckOverList)
-   {
-      var _loc2_ = abCheckOverList != undefined?abCheckOverList:true;
-      if(this.shouldProcessItemsListInput(_loc2_))
-      {
-         this.startItemEquip(aiSlot);
-      }
-   }
-   function AttemptTakeAll()
-   {
-      if(this.isViewingContainer() && !this.bNPCMode)
-      {
-         gfx.io.GameDelegate.call("TakeAllItems",[]);
-      }
-   }
-   function AttemptStore()
-   {
-      if(!this.isViewingContainer())
-      {
-         this.startItemTransfer();
-      }
-   }
-   function Vanilla_XButtonPress()
-   {
-      if(!this.bFadedIn)
-      {
-         return undefined;
-      }
-      if(this.isViewingContainer() && !this.bNPCMode)
-      {
-         gfx.io.GameDelegate.call("TakeAllItems",[]);
-      }
-      else if(!this.isViewingContainer())
-      {
-         this.startItemTransfer();
-      }
-   }
-   function onItemSelect(event)
-   {
-      if(event.keyboardOrMouse != 0)
-      {
-         if(this._platform == 0 && this._bEquipMode)
-         {
-            this.startItemEquip(ContainerMenu.NULL_HAND);
-         }
-         else
-         {
-            this.startItemTransfer();
-         }
-      }
-   }
-   function onItemCardSubMenuAction(event)
-   {
-      super.onItemCardSubMenuAction(event);
-      if(event.menu == "quantity")
-      {
-         gfx.io.GameDelegate.call("QuantitySliderOpen",[event.opening]);
-      }
-   }
-   function onItemHighlightChange(event)
-   {
-      if(event.index != -1)
-      {
-         this.updateBottomBar(true);
-      }
-      super.onItemHighlightChange(event);
-   }
-   function onShowItemsList(event)
-   {
-      this.inventoryLists.showItemsList();
-   }
-   function onHideItemsList(event)
-   {
-      super.onHideItemsList(event);
-      this.bottomBar.updatePerItemInfo({type:skyui.defines.Inventory.ICT_NONE});
-      this.updateBottomBar(false);
-   }
-   function onMouseRotationFastClick(a_mouseButton)
-   {
-      gfx.io.GameDelegate.call("CheckForMouseEquip",[a_mouseButton],this,"AttemptEquip");
-   }
-   function onQuantityMenuSelect(event)
-   {
-      if(this._equipHand != undefined)
-      {
-         gfx.io.GameDelegate.call("EquipItem",[this._equipHand,event.amount]);
-         if(!this.checkBook(this.inventoryLists.itemList.__get__selectedEntry()))
-         {
-            this.checkPoison(this.inventoryLists.itemList.__get__selectedEntry());
-         }
-         this._equipHand = undefined;
-         return undefined;
-      }
-      if(this.inventoryLists.itemList.__get__selectedEntry().enabled)
-      {
-         gfx.io.GameDelegate.call("ItemTransfer",[event.amount,this.isViewingContainer()]);
-         return undefined;
-      }
-      gfx.io.GameDelegate.call("DisabledItemSelect",[]);
-   }
-   function updateBottomBar(a_bSelected)
-   {
-      this.navPanel.clearButtons();
-      var _loc15_ = skyui.util.Input.pickControls(this._platform,{PCArt:"M1M2",XBoxArt:"360_LTRT",PS3Art:"PS3_LTRT",ViveArt:"trigger_LR",MoveArt:"PS3_A",OculusArt:"trigger_LR",WindowsMRArt:"trigger_LR"});
-      var _loc5_ = skyui.util.Input.pickControls(this._platform,{PCArt:"R",XBoxArt:"360_X",PS3Art:"PS3_X",ViveArt:"radial_Either_Left",MoveArt:"PS3_B",OculusArt:"OCC_Y",WindowsMRArt:"radial_Either_Left"});
-      var _loc6_ = skyui.util.Input.pickControls(this._platform,{PCArt:"E",XBoxArt:"360_A",PS3Art:"PS3_A",ViveArt:"radial_Either_Center",MoveArt:"PS3_MOVE",OculusArt:"OCC_A",WindowsMRArt:"radial_Either_Center"});
-      var _loc8_ = skyui.util.Input.pickControls(this._platform,{PCArt:"F",XBoxArt:"360_Y",PS3Art:"PS3_Y",ViveArt:"radial_Either_Right",MoveArt:"PS3_Y",OculusArt:"OCC_B",WindowsMRArt:"radial_Either_Right"});
-      var _loc7_ = {PCArt:"M1M2",XBoxArt:"360_LTRT",PS3Art:"PS3_LTRT",ViveArt:"trigger_LR",MoveArt:"PS3_MOVE",OculusArt:"trigger_LR",WindowsMRArt:"trigger_LR"};
-      var _loc4_ = {PCArt:"E",XBoxArt:"360_A",PS3Art:"PS3_A",ViveArt:"trigger",MoveArt:"PS3_MOVE",OculusArt:"trigger",WindowsMRArt:"trigger"};
-      var _loc3_ = undefined;
-      var _loc2_ = undefined;
-      switch(this.itemCard.itemInfo.type)
-      {
-         case skyui.defines.Inventory.ICT_BOOK:
-            _loc3_ = "$Read";
-            _loc2_ = _loc4_;
-            break;
-         case skyui.defines.Inventory.ICT_POTION:
-            _loc3_ = "$Use";
-            _loc2_ = _loc4_;
-            break;
-         case skyui.defines.Inventory.ICT_FOOD:
-         case skyui.defines.Inventory.ICT_INGREDIENT:
-            _loc3_ = "$Eat";
-            _loc2_ = _loc4_;
-            break;
-         case skyui.defines.Inventory.ICT_ARMOR:
-         case skyui.defines.Inventory.ICT_WEAPON:
-            _loc3_ = "$Equip";
-            _loc2_ = _loc7_;
-      }
-      if(_loc2_ != undefined)
-      {
-         this.navPanel.addButton({text:_loc3_,controls:skyui.util.Input.pickControls(this._platform,_loc2_)});
-      }
-      if(a_bSelected && this.inventoryLists.itemList.__get__selectedIndex() != -1 && this.inventoryLists.__get__currentState() == InventoryLists.SHOW_PANEL)
-      {
-         if(this.isViewingContainer())
-         {
-            this.navPanel.addButton({text:"$Take",controls:_loc6_});
-            if(!this.bNPCMode)
-            {
-               this.navPanel.addButton({text:"$Take All",controls:_loc5_});
-            }
-         }
-         else
-         {
-            this.navPanel.addButton({text:(!this.bNPCMode?"$Store":"$Give"),controls:_loc6_});
-            this.navPanel.addButton({text:(!this.itemCard.itemInfo.favorite?"$Favorite":"$Unfavorite"),controls:_loc8_});
-         }
-      }
-      else
-      {
-         if(this._platform != 0)
-         {
-            this.navPanel.addButton({text:"$Column",controls:{namedKey:"Action_Up"}});
-            this.navPanel.addButton({text:"$Order",controls:{namedKey:"Action_Double_Up"}});
-         }
-         this.navPanel.addButton({text:"$Switch Tab",controls:{namedKey:"Action_Left"}});
-         if(this.isViewingContainer() && !this.bNPCMode)
-         {
-            this.navPanel.addButton({text:"$Take All",controls:_loc5_});
-         }
-      }
-      this.navPanel.updateButtons(true);
-   }
-   function startItemTransfer()
-   {
-      if(this.inventoryLists.itemList.__get__selectedEntry().enabled)
-      {
-         if(this.itemCard.itemInfo.weight == 0 && this.isViewingContainer())
-         {
-            this.onQuantityMenuSelect({amount:this.inventoryLists.itemList.__get__selectedEntry().count});
-            return undefined;
-         }
-         if(this._quantityMinCount < 1 || this.inventoryLists.itemList.__get__selectedEntry().count < this._quantityMinCount)
-         {
-            this.onQuantityMenuSelect({amount:1});
-         }
-         else
-         {
-            this.itemCard.ShowQuantityMenu(this.inventoryLists.itemList.__get__selectedEntry().count);
-         }
-      }
-   }
-   function startItemEquip(a_equipHand)
-   {
-      if(this.isViewingContainer())
-      {
-         this._equipHand = a_equipHand;
-         this.startItemTransfer();
-         return undefined;
-      }
-      gfx.io.GameDelegate.call("EquipItem",[a_equipHand]);
-      if(!this.checkBook(this.inventoryLists.itemList.__get__selectedEntry()))
-      {
-         this.checkPoison(this.inventoryLists.itemList.__get__selectedEntry());
-      }
-   }
-   function isViewingContainer()
-   {
-      return this.inventoryLists.categoryList.__get__activeSegment() == 0;
-   }
-   function checkPoison(a_entryObject)
-   {
-      if(a_entryObject.type != skyui.defines.Inventory.ICT_POTION || _global.skse == null)
-      {
-         return false;
-      }
-      if(a_entryObject.subType != skyui.defines.Item.POTION_POISON)
-      {
-         return false;
-      }
-      this._bEquipMode = false;
-      return true;
-   }
+	#include "../version.as"
+
+  /* CONSTANTS */
+
+	private static var NULL_HAND: Number = -1;
+	private static var RIGHT_HAND: Number = 0;
+	private static var LEFT_HAND: Number = 1;
+
+
+  /* PRIVATE VARIABLES */
+
+	private var _bEquipMode: Boolean = false;
+	private var _equipHand: Number;
+
+	private var _equipModeKey: Number;
+	private var _equipModeControls: Object;
+
+	private var _tabBarIconArt: Array;
+
+	private var _pauseInputHandling: Boolean;
+	private var _pauseTabSwitch: Boolean;
+
+	private var _columnOpRequested: Number;
+
+
+  /* PROPERTIES */
+
+	// @API
+	public var bNPCMode: Boolean = false;
+
+	// @override ItemMenu
+	public var bEnableTabs: Boolean = true;
+
+
+  /* INITIALIZATION */
+
+	public function ContainerMenu()
+	{
+		super();
+
+		_tabBarIconArt = ["take", "give"];
+		_pauseInputHandling = false;
+		_columnOpRequested = 0;
+	}
+
+
+  /* PUBLIC FUNCTIONS */
+
+	public function InitExtensions(): Void
+	{
+		super.InitExtensions();
+
+		inventoryLists.tabBarIconArt = _tabBarIconArt;
+
+		// Initialize menu-specific list components
+		inventoryLists.categoryList.iconArt = ["inv_all", "inv_weapons", "inv_armor", "inv_potions", "inv_scrolls", "inv_food", "inv_ingredients", "inv_books", "inv_keys", "inv_misc"];
+
+		GameDelegate.addCallBack("AttemptEquip", this, "AttemptEquip");
+    GameDelegate.addCallBack("AttemptTake",this,"AttemptTake");
+    GameDelegate.addCallBack("AttemptTakeAll",this,"AttemptTakeAll");
+    GameDelegate.addCallBack("AttemptStore",this,"AttemptStore");
+    GameDelegate.addCallBack("AttemptTakeAndEquip",this,"AttemptTakeAndEquip");
+    GameDelegate.addCallBack("Vanilla_AttemptEquip",this,"Vanilla_AttemptEquip");
+    GameDelegate.addCallBack("Vanilla_XButtonPress",this,"Vanilla_XButtonPress");
+
+		itemCardFadeHolder.StealTextInstance._visible = false;
+	}
+
+	// @override ItemMenu
+	public function setConfig(a_config: Object): Void
+	{
+		super.setConfig(a_config);
+
+		var itemList: TabularList = inventoryLists.itemList;
+		itemList.addDataProcessor(new InventoryDataSetter());
+		itemList.addDataProcessor(new InventoryIconSetter(a_config["Appearance"]));
+		itemList.addDataProcessor(new PropertyDataExtender(a_config["Appearance"], a_config["Properties"], "itemProperties", "itemIcons", "itemCompoundProperties"));
+
+		var layout: ListLayout = ListLayoutManager.createLayout(a_config["ListLayout"], "ItemListLayout");
+		itemList.layout = layout;
+
+		// Not 100% happy with doing this here, but has to do for now.
+		if (inventoryLists.categoryList.selectedEntry)
+			layout.changeFilterFlag(inventoryLists.categoryList.selectedEntry.flag);
+
+		_equipModeKey = a_config["Input"].controls.pc.equipMode;
+		_equipModeControls = {keyCode: _equipModeKey};
+	}
+
+	// @API
+	public function ShowItemsList(): Void
+	{
+		// Not necessary anymore. Now handled in onShowItemsList for consistency reasons.
+		//inventoryLists.showItemsList();
+	}
+
+	// @GFx
+	public function handleInput(details: InputDetails, pathToFocus: Array): Boolean
+	{
+		// Rate limit input handling
+		// For some reason, VR trackpad swipe events seem to be sent in duplictes?
+		// This means if we're using the trackpad to enable some kind of toggling logic,
+		// the toggle would always cancel itself out. To get around this, we...
+		//
+		// Limit processing of these events to something reasonable.
+		if(_pauseInputHandling)
+			return true;
+
+		skyui.util.Input.rateLimit(this, "_pauseInputHandling", 10);
+
+
+		// VR specific behavior
+		//
+		// Currently, we're not getting a whole lot of keycodes from the game. We cannot
+		// hookup additional keypresses to UI behavior arbitrarily. However, we can continue
+		// to make use of NavigationCode.LEFT and RIGHT.
+		//
+		// The original SkyUI category list allows the player to wrap around the list. Here,
+		// we alter the behavior so that...
+		//
+		// If we've reached the beginning the category list and the player is still asking to
+		// navigate left, switch active segment instead.
+		var bShouldCaptureInput = (pathToFocus[0] != itemCard);
+		if (bShouldCaptureInput &&
+				Shared.GlobalFunc.IsKeyPressed(details) &&
+				details.navEquivalent == NavigationCode.LEFT && inventoryLists.categoryList.selectionAtBeginningOfSegment()) {
+
+			// Only actually toggle the tab if we're not being rate limited
+			if(!_pauseTabSwitch) {
+				inventoryLists.toggleTab();
+
+				// Rate limit tab switching to 3 times a second
+				skyui.util.Input.rateLimit(this, "_pauseTabSwitch", 1000/3);
+			}
+
+			return true;
+		}
+
+		super.handleInput(details,pathToFocus);
+
+		if (shouldProcessItemsListInput(false)) {
+			if ((_platform == Shared.Platforms.CONTROLLER_PC ||
+					 _platform == Shared.Platforms.CONTROLLER_VIVE ||
+					 _platform == Shared.Platforms.CONTROLLER_OCULUS ||
+					 _platform == Shared.Platforms.CONTROLLER_WINDOWS_MR)
+				&& details.skseKeycode == _equipModeKey && inventoryLists.itemList.selectedIndex != -1) {
+				_bEquipMode = details.value != "keyUp";
+				updateBottomBar(true);
+			}
+		}
+
+		return true;
+	}
+
+	// @override ItemMenu
+	public function UpdateItemCardInfo(a_updateObj: Object): Void
+	{
+		super.UpdateItemCardInfo(a_updateObj);
+
+		updateBottomBar(true);
+
+		if (a_updateObj.pickpocketChance != undefined) {
+			itemCardFadeHolder.StealTextInstance._visible = true;
+			itemCardFadeHolder.StealTextInstance.PercentTextInstance.html = true;
+			itemCardFadeHolder.StealTextInstance.PercentTextInstance.htmlText = "<font face=\'$EverywhereBoldFont\' size=\'24\' color=\'#FFFFFF\'>" + a_updateObj.pickpocketChance + "%</font>" + (isViewingContainer() ? Translator.translate("$ TO STEAL") : Translator.translate("$ TO PLACE"));
+		} else {
+			itemCardFadeHolder.StealTextInstance._visible = false;
+		}
+	}
+
+	// @API
+	public function AttemptEquip(a_slot: Number, a_bCheckOverList: Boolean): Void
+	{
+		// Function not present in VR interface file
+	}
+
+
+	// @API
+	public function SetPlatform(a_platform: Number, a_bPS3Switch: Boolean): Void
+	{
+		super.SetPlatform(a_platform,a_bPS3Switch);
+
+		_bEquipMode = (a_platform != 0);
+	}
+
+
+	// @API
+	public function Vanilla_AttemptEquip(a_slot: Number, a_bCheckOverList: Boolean): Void
+	{
+		var bCheckOverList = a_bCheckOverList == undefined ? true : a_bCheckOverList;
+
+		if (!shouldProcessItemsListInput(bCheckOverList) || !confirmSelectedEntry())
+			return;
+
+		if (_platform == Shared.Platforms.CONTROLLER_PC ||
+			  _platform == Shared.Platforms.CONTROLLER_VIVE ||
+			  _platform == Shared.Platforms.CONTROLLER_OCULUS ||
+			  _platform == Shared.Platforms.CONTROLLER_WINDOWS_MR) {
+			if (_bEquipMode)
+				startItemEquip(a_slot);
+			else
+				startItemTransfer();
+		} else {
+			startItemEquip(a_slot);
+		}
+	}
+
+	// @API
+  function AttemptTake(abCheckOverList)
+  {
+    var bCheckOverList = abCheckOverList == undefined ? true : abCheckOverList;
+    if(shouldProcessItemsListInput(bCheckOverList))
+      startItemTransfer();
+  }
+
+	// @API
+  function AttemptTakeAndEquip(aiSlot, abCheckOverList)
+  {
+    var bCheckOverList = abCheckOverList == undefined?true:abCheckOverList;
+    if(shouldProcessItemsListInput(bCheckOverList))
+      startItemEquip(aiSlot);
+  }
+
+	// @API
+  function AttemptTakeAll()
+  {
+    if(isViewingContainer() && !bNPCMode)
+      GameDelegate.call("TakeAllItems",[]);
+  }
+
+	// @API
+  function AttemptStore()
+  {
+    if(!isViewingContainer())
+      startItemTransfer();
+  }
+
+	// @API
+	public function Vanilla_XButtonPress(): Void
+	{
+		// If we are zoomed into an item, do nothing
+		if (!bFadedIn)
+			return;
+
+		if (isViewingContainer() && !bNPCMode)
+			GameDelegate.call("TakeAllItems",[]);
+
+		// TODO! Is this really required?
+		// Present in SE and VR but not in SkyUI.
+		// Maybe skyui already takes care of this case elsewhere?
+		else if (!isViewingContainer())
+			startItemTransfer();
+	}
+
+  /* PRIVATE FUNCTIONS */
+
+	private function onItemSelect(event: Object): Void
+	{
+		if (event.keyboardOrMouse != 0) {
+			if (_platform == 0 && _bEquipMode)
+				startItemEquip(ContainerMenu.NULL_HAND);
+			else
+				startItemTransfer();
+		}
+	}
+
+	private function onItemCardSubMenuAction(event: Object): Void
+	{
+		super.onItemCardSubMenuAction(event);
+
+		if (event.menu == "quantity")
+			GameDelegate.call("QuantitySliderOpen", [event.opening]);
+	}
+
+	// @override ItemMenu
+	private function onItemHighlightChange(event: Object): Void
+	{
+		if (event.index != -1)
+			updateBottomBar(true);
+
+		super.onItemHighlightChange(event);
+	}
+
+	// @override ItemMenu
+	private function onShowItemsList(event: Object): Void
+	{
+		inventoryLists.showItemsList();
+	}
+
+	// @override ItemMenu
+	private function onHideItemsList(event: Object): Void
+	{
+		super.onHideItemsList(event);
+
+		bottomBar.updatePerItemInfo({type:Inventory.ICT_NONE});
+
+		updateBottomBar(false);
+	}
+
+	private function onMouseRotationFastClick(a_mouseButton:Number): Void
+	{
+		GameDelegate.call("CheckForMouseEquip",[a_mouseButton],this,"AttemptEquip");
+	}
+
+	private function onQuantityMenuSelect(event: Object): Void
+	{
+		if (_equipHand != undefined) {
+			GameDelegate.call("EquipItem",[_equipHand, event.amount]);
+
+			if (!checkBook(inventoryLists.itemList.selectedEntry))
+				checkPoison(inventoryLists.itemList.selectedEntry);
+
+			_equipHand = undefined;
+			return;
+		}
+
+		if (inventoryLists.itemList.selectedEntry.enabled) {
+			GameDelegate.call("ItemTransfer",[event.amount, isViewingContainer()]);
+			return;
+		}
+
+		GameDelegate.call("DisabledItemSelect",[]);
+	}
+
+	// @override ItemMenu
+	private function updateBottomBar(a_bSelected: Boolean): Void
+	{
+		navPanel.clearButtons();
+
+		var equipControl = skyui.util.Input.pickControls(_platform, {PCArt:"M1M2",XBoxArt:"360_LTRT",PS3Art:"PS3_LTRT",ViveArt:"trigger_LR",MoveArt:"PS3_A",OculusArt:"trigger_LR",WindowsMRArt:"trigger_LR"});
+		var takeAllControl = skyui.util.Input.pickControls(_platform, {PCArt:"R",XBoxArt:"360_X",PS3Art:"PS3_X",ViveArt:"radial_Either_Left",MoveArt:"PS3_B",OculusArt:"OCC_Y",WindowsMRArt:"radial_Either_Left"});
+		var activateControl = skyui.util.Input.pickControls(_platform, {PCArt:"E",XBoxArt:"360_A",PS3Art:"PS3_A",ViveArt:"radial_Either_Center",MoveArt:"PS3_MOVE",OculusArt:"OCC_A",WindowsMRArt:"radial_Either_Center"});
+		var favoriteControl = skyui.util.Input.pickControls(_platform, {PCArt:"F",XBoxArt:"360_Y",PS3Art:"PS3_Y",ViveArt:"radial_Either_Right",MoveArt:"PS3_Y",OculusArt:"OCC_B",WindowsMRArt:"radial_Either_Right"});
+
+		// Setup the main action button
+		var equipArt = {PCArt:"M1M2", XBoxArt:"360_LTRT", PS3Art:"PS3_LTRT", ViveArt: "trigger_LR",
+			MoveArt:"PS3_MOVE", OculusArt: "trigger_LR", WindowsMRArt: "trigger_LR"};
+    var useItemArt = {PCArt:"E",XBoxArt:"360_A",PS3Art:"PS3_A",ViveArt:"trigger",MoveArt:"PS3_MOVE",OculusArt:"trigger",WindowsMRArt:"trigger"};
+
+		var actionText = undefined;
+		var actionArt = undefined;
+		switch(itemCard.itemInfo.type)
+		{
+			case Inventory.ICT_BOOK:
+				actionText = "$Read";
+				actionArt = useItemArt;
+				break;
+			case Inventory.ICT_POTION:
+				actionText = "$Use";
+				actionArt = useItemArt;
+				break;
+			case Inventory.ICT_FOOD:
+			case Inventory.ICT_INGREDIENT:
+				actionText = "$Eat";
+				actionArt = useItemArt;
+				break;
+			case Inventory.ICT_ARMOR:
+			case Inventory.ICT_WEAPON:
+				actionText = "$Equip";
+				actionArt = equipArt;
+				break;
+		}
+
+		if (actionArt != undefined)
+			navPanel.addButton({text: actionText, controls: skyui.util.Input.pickControls(_platform, actionArt)});
+
+		if (a_bSelected && inventoryLists.itemList.selectedIndex != -1 && inventoryLists.currentState == InventoryLists.SHOW_PANEL) {
+			if (isViewingContainer()) {
+				navPanel.addButton({text: "$Take", controls: activateControl});
+				if (!bNPCMode)
+					navPanel.addButton({text: "$Take All", controls: takeAllControl});
+			} else {
+				navPanel.addButton({text: bNPCMode ? "$Give" : "$Store", controls: activateControl});
+				navPanel.addButton({text: itemCard.itemInfo.favorite ? "$Unfavorite" : "$Favorite", controls: favoriteControl});
+			}
+			// if (!_bEquipMode)
+			//	 navPanel.addButton({text: "$Equip Mode", controls: _equipModeControls});
+		} else {
+			// navPanel.addButton({text: "$Exit", controls: _cancelControls});
+			// navPanel.addButton({text: "$Search", controls: _searchControls});
+			if (_platform != 0) {
+				navPanel.addButton({text: "$Column", controls: {namedKey: "Action_Up"}});
+				navPanel.addButton({text: "$Order", controls: {namedKey: "Action_Double_Up"}});
+			}
+			navPanel.addButton({text: "$Switch Tab", controls: {namedKey: "Action_Left"}});
+
+			if (isViewingContainer() && !bNPCMode)
+				navPanel.addButton({text: "$Take All", controls: takeAllControl});
+
+		}
+
+		navPanel.updateButtons(true);
+	}
+
+	private function startItemTransfer(): Void
+	{
+		if (inventoryLists.itemList.selectedEntry.enabled) {
+			// Don't remove. This is so if an item weighs nothing, it takes the whole stack
+			//  Gold, for example.
+			if (itemCard.itemInfo.weight == 0 && isViewingContainer()) {
+				onQuantityMenuSelect({amount:inventoryLists.itemList.selectedEntry.count});
+				return;
+			}
+
+			if (_quantityMinCount < 1 || (inventoryLists.itemList.selectedEntry.count < _quantityMinCount)) {
+				onQuantityMenuSelect({amount:1});
+			} else {
+				itemCard.ShowQuantityMenu(inventoryLists.itemList.selectedEntry.count);
+			}
+		}
+	}
+
+	private function startItemEquip(a_equipHand: Number): Void
+	{
+		if (isViewingContainer()) {
+			_equipHand = a_equipHand;
+			startItemTransfer();
+			return;
+		}
+
+		GameDelegate.call("EquipItem",[a_equipHand]);
+		if (!checkBook(inventoryLists.itemList.selectedEntry))
+			checkPoison(inventoryLists.itemList.selectedEntry);
+	}
+
+	private function isViewingContainer(): Boolean
+	{
+		return (inventoryLists.categoryList.activeSegment == 0);
+	}
+
+	/*
+		This method is only used in ContainerMenu.
+		If you attempt to use a poison in Container menu
+		  a dialog box is presented to ask whether you want to poison the equipped weapon
+		  If you release the _equipModeKey while the diaolog is present, the keyUp event
+		  for this key is not received by ContainerMenu, so _bEquipMode remains true
+		  meaning that the bottom bar buttons are incorrect
+	*/
+	private function checkPoison(a_entryObject: Object): Boolean
+	{
+		if (a_entryObject.type != Inventory.ICT_POTION || _global.skse == null)
+			return false;
+
+		if (a_entryObject.subType != Item.POTION_POISON)
+			return false;
+
+		// force equip mode to false.
+		// Use this until we can detect if a specific keyCode is depressed
+		// _bEquipMode = skse.IsKeyDown(_equipModeKey)
+		_bEquipMode = false;
+
+		return true;
+	}
 }
