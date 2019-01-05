@@ -1,423 +1,453 @@
-import Shared.GlobalFunc;
-import gfx.ui.InputDetails;
-import gfx.ui.NavigationCode;
-import gfx.events.EventDispatcher;
-
 class Shared.BSScrollingList extends MovieClip
 {
-	static var TEXT_OPTION_NONE: Number = 0;
-	static var TEXT_OPTION_SHRINK_TO_FIT: Number = 1;
-	static var TEXT_OPTION_MULTILINE: Number = 2;
-	
-	var EntriesA: Array;
-	
-	var scrollbar: Object;
-	var ListScrollbar: Object;
-	
-	var ScrollDown: MovieClip;
-	var ScrollUp: MovieClip;
-	var border: MovieClip;
-	
-	var bDisableInput: Boolean;
-	var bDisableSelection: Boolean;
-	var bListAnimating: Boolean;
-	var bMouseDrivenNav: Boolean;
-	
-	var dispatchEvent: Function;
-	var onMousePress: Function;
-	
-	var fListHeight: Number;
-	var iListItemsShown: Number;
-	var iMaxItemsShown: Number;
-	var iMaxScrollPosition: Number;
-	var iPlatform: Number;
-	var iScrollPosition: Number;
-	var iScrollbarDrawTimerID: Number;
-	var iSelectedIndex: Number;
-	var iTextOption: Number;
-	var itemIndex: Number;
-	
-	function BSScrollingList()
-	{
-		super();
-		EntriesA = new Array();
-		bDisableSelection = false;
-		bDisableInput = false;
-		bMouseDrivenNav = false;
-		EventDispatcher.initialize(this);
-		Mouse.addListener(this);
-		
-		iSelectedIndex = -1;
-		iScrollPosition = 0;
-		iMaxScrollPosition = 0;
-		iListItemsShown = 0;
-		iPlatform = 1;
-		fListHeight = border._height;
-		ListScrollbar = scrollbar;
-		iMaxItemsShown = 0;
-		
-		for (var item: MovieClip = GetClipByIndex(iMaxItemsShown); item != undefined; item = GetClipByIndex(++iMaxItemsShown)) {
-			item.clipIndex = iMaxItemsShown;
-			item.onRollOver = function ()
-			{
-				if (!_parent.listAnimating && !_parent.bDisableInput && itemIndex != undefined) {
-					_parent.doSetSelectedIndex(itemIndex, 0);
-					_parent.bMouseDrivenNav = true;
-				}
-			};
-			item.onPress = function (aiMouseIndex, aiKeyboardOrMouse)
-			{
-				if (itemIndex != undefined) {
-					_parent.onItemPress(aiKeyboardOrMouse);
-					if (!_parent.bDisableInput && onMousePress != undefined)
-						onMousePress();
-				}
-			};
-			item.onPressAux = function (aiMouseIndex, aiKeyboardOrMouse, aiButtonIndex)
-			{
-				if (itemIndex != undefined) 
-					_parent.onItemPressAux(aiKeyboardOrMouse, aiButtonIndex);
-			};
-		}
-	}
-
-	function onLoad(): Void
-	{
-		if (ListScrollbar != undefined) {
-			ListScrollbar.position = 0;
-			ListScrollbar.addEventListener("scroll", this, "onScroll");
-		}
-	}
-
-	function ClearList(): Void
-	{
-		EntriesA.splice(0, EntriesA.length);
-	}
-
-	function GetClipByIndex(aiIndex: Number): MovieClip
-	{
-		return this["Entry" + aiIndex];
-	}
-
-	function handleInput(details: InputDetails, pathToFocus: Array): Boolean
-	{
-		var bHandledInput: Boolean = false;
-		if (!bDisableInput) {
-			var item: MovieClip = GetClipByIndex(selectedIndex - scrollPosition);
-			bHandledInput = item != undefined && item.handleInput != undefined && item.handleInput(details, pathToFocus.slice(1));
-			if (!bHandledInput && GlobalFunc.IsKeyPressed(details)) {
-				if (details.navEquivalent == NavigationCode.UP) {
-					moveSelectionUp();
-					bHandledInput = true;
-				} else if (details.navEquivalent == NavigationCode.DOWN) {
-					moveSelectionDown();
-					bHandledInput = true;
-				} else if (!bDisableSelection && details.navEquivalent == NavigationCode.ENTER) {
-					onItemPress();
-					bHandledInput = true;
-				}
-			}
-		}
-		return bHandledInput;
-	}
-
-	function onMouseWheel(delta: Number): Void
-	{
-		if (!bDisableInput) {
-			for (var target = Mouse.getTopMostEntity(); target && target != undefined; target = target._parent) {
-				if (target == this) {
-					doSetSelectedIndex(-1,0);
-					if (delta < 0)
-						scrollPosition = scrollPosition + 1;
-					else if (delta > 0)
-						scrollPosition = scrollPosition - 1;
-				}
-			}
-		}
-	}
-
-	function get selectedIndex(): Number
-	{
-		return iSelectedIndex;
-	}
-
-	function set selectedIndex(aiNewIndex: Number): Void
-	{
-		doSetSelectedIndex(aiNewIndex);
-	}
-
-	function get listAnimating(): Boolean
-	{
-		return bListAnimating;
-	}
-
-	function set listAnimating(abFlag: Boolean): Void
-	{
-		bListAnimating = abFlag;
-	}
-
-	function doSetSelectedIndex(aiNewIndex:Number, aiKeyboardOrMouse: Number): Void
-	{
-		if (!bDisableSelection && aiNewIndex != iSelectedIndex) {
-			var iCurrentIndex: Number = iSelectedIndex;
-			iSelectedIndex = aiNewIndex;
-			
-			if (iCurrentIndex != -1)
-				SetEntry(GetClipByIndex(EntriesA[iCurrentIndex].clipIndex),EntriesA[iCurrentIndex]);
-
-			if (iSelectedIndex != -1) {
-				if (iPlatform != Shared.Platforms.CONTROLLER_PC) {
-					if (iSelectedIndex < iScrollPosition)
-						scrollPosition = iSelectedIndex;
-					else if (iSelectedIndex >= iScrollPosition + iListItemsShown)
-						scrollPosition = Math.min(iSelectedIndex - iListItemsShown + 1, iMaxScrollPosition);
-					else
-						SetEntry(GetClipByIndex(EntriesA[iSelectedIndex].clipIndex),EntriesA[iSelectedIndex]);
-				} else {
-					SetEntry(GetClipByIndex(EntriesA[iSelectedIndex].clipIndex),EntriesA[iSelectedIndex]);
-				}
-			}
-			dispatchEvent({type:"selectionChange", index:iSelectedIndex, keyboardOrMouse:aiKeyboardOrMouse});
-		}
-	}
-
-	function get scrollPosition(): Number
-	{
-		return iScrollPosition;
-	}
-
-	function get maxScrollPosition(): Number
-	{
-		return iMaxScrollPosition;
-	}
-
-	function set scrollPosition(aiNewPosition: Number): Void
-	{
-		if (aiNewPosition != iScrollPosition && aiNewPosition >= 0 && aiNewPosition <= iMaxScrollPosition) {
-			if (ListScrollbar == undefined) 
-				updateScrollPosition(aiNewPosition);
-			else 
-				ListScrollbar.position = aiNewPosition;
-		}
-	}
-
-	function updateScrollPosition(aiPosition: Number): Void
-	{
-		iScrollPosition = aiPosition;
-		UpdateList();
-	}
-
-	function get selectedEntry(): Object
-	{
-		return EntriesA[iSelectedIndex];
-	}
-
-	function get entryList(): Array
-	{
-		return EntriesA;
-	}
-
-	function set entryList(anewArray: Array): Void
-	{
-		EntriesA = anewArray;
-	}
-
-	function get disableSelection(): Boolean
-	{
-		return bDisableSelection;
-	}
-
-	function set disableSelection(abFlag: Boolean): Void
-	{
-		bDisableSelection = abFlag;
-	}
-
-	function get disableInput(): Boolean
-	{
-		return bDisableInput;
-	}
-
-	function set disableInput(abFlag: Boolean): Void
-	{
-		bDisableInput = abFlag;
-	}
-
-	function get maxEntries(): Number
-	{
-		return iMaxItemsShown;
-	}
-
-	function get textOption(): Number
-	{
-		return iTextOption;
-	}
-
-	function set textOption(strNewOption: String): Void
-	{
-		if (strNewOption == "None") 
-			iTextOption = Shared.BSScrollingList.TEXT_OPTION_NONE;
-		else if (strNewOption == "Shrink To Fit") 
-			iTextOption = Shared.BSScrollingList.TEXT_OPTION_SHRINK_TO_FIT;
-		else if (strNewOption == "Multi-Line") 
-			iTextOption = Shared.BSScrollingList.TEXT_OPTION_MULTILINE;
-	}
-
-	function UpdateList(): Void
-	{
-		var iFirstItemy: Number = GetClipByIndex(0)._y;
-		var iItemHeightSum: Number = 0;
-		var iLastItemShownIndex: Number = 0;
-		while (iLastItemShownIndex < iScrollPosition) {
-			EntriesA[iLastItemShownIndex].clipIndex = undefined;
-			++iLastItemShownIndex;
-		}
-		iListItemsShown = 0;
-		iLastItemShownIndex = iScrollPosition;
-		while (iLastItemShownIndex < EntriesA.length && iListItemsShown < iMaxItemsShown && iItemHeightSum <= fListHeight) {
-			var item: MovieClip = GetClipByIndex(iListItemsShown);
-			SetEntry(item, EntriesA[iLastItemShownIndex]);
-			EntriesA[iLastItemShownIndex].clipIndex = iListItemsShown;
-			item.itemIndex = iLastItemShownIndex;
-			item._y = iFirstItemy + iItemHeightSum;
-			item._visible = true;
-			iItemHeightSum += item._height;
-			if (iItemHeightSum <= fListHeight && iListItemsShown < iMaxItemsShown) 
-				++iListItemsShown;
-			++iLastItemShownIndex;
-		}
-		var iLastItemIndex: Number = iListItemsShown;
-		while (iLastItemIndex < iMaxItemsShown) {
-			GetClipByIndex(iLastItemIndex)._visible = false;
-			++iLastItemIndex;
-		}
-		if (ScrollUp != undefined) 
-			ScrollUp._visible = scrollPosition > 0;
-		if (ScrollDown != undefined) 
-			ScrollDown._visible = scrollPosition < iMaxScrollPosition;
-	}
-
-	function InvalidateData(): Void
-	{
-		var iMaxScrollPos: Number = iMaxScrollPosition;
-		fListHeight = border._height;
-		CalculateMaxScrollPosition();
-		if (ListScrollbar != undefined) {
-			if (iMaxScrollPos == iMaxScrollPosition) {
-				SetScrollbarVisibility();
-			} else {
-				ListScrollbar._visible = false;
-				ListScrollbar.setScrollProperties(iMaxItemsShown, 0, iMaxScrollPosition);
-				if (iScrollbarDrawTimerID != undefined) 
-					clearInterval(iScrollbarDrawTimerID);
-				iScrollbarDrawTimerID = setInterval(this, "SetScrollbarVisibility", 50);
-			}
-		}
-		if (iSelectedIndex >= EntriesA.length) 
-			iSelectedIndex = EntriesA.length - 1;
-		if (iScrollPosition > iMaxScrollPosition) 
-			iScrollPosition = iMaxScrollPosition;
-		UpdateList();
-	}
-
-	function SetScrollbarVisibility(): Void
-	{
-		clearInterval(iScrollbarDrawTimerID);
-		iScrollbarDrawTimerID = undefined;
-		ListScrollbar._visible = iMaxScrollPosition > 0;
-	}
-
-	function CalculateMaxScrollPosition(): Void
-	{
-		var iItemHeightSum: Number = 0;
-		var iLastItemIndex: Number = EntriesA.length - 1;
-		while (iLastItemIndex >= 0 && iItemHeightSum <= fListHeight) {
-			iItemHeightSum += GetEntryHeight(iLastItemIndex);
-			if (iItemHeightSum <= fListHeight) 
-				--iLastItemIndex;
-		}
-		iMaxScrollPosition = iLastItemIndex + 1;
-	}
-
-	function GetEntryHeight(aiEntryIndex: Number): Number
-	{
-		var item: MovieClip = GetClipByIndex(0);
-		SetEntry(item, EntriesA[aiEntryIndex]);
-		return item._height;
-	}
-
-	function moveSelectionUp(): Void
-	{
-		if (!bDisableSelection) {
-			if (selectedIndex > 0) 
-				selectedIndex = selectedIndex - 1;
-			return;
-		}
-		scrollPosition = scrollPosition - 1;
-	}
-
-	function moveSelectionDown(): Void
-	{
-		if (!bDisableSelection) {
-			if (selectedIndex < EntriesA.length - 1) 
-				selectedIndex = selectedIndex + 1;
-			return;
-		}
-		scrollPosition = scrollPosition + 1;
-	}
-
-	function onItemPress(aiKeyboardOrMouse: Number): Void
-	{
-		if (!bDisableInput && !bDisableSelection && iSelectedIndex != -1) {
-			dispatchEvent({type: "itemPress", index: iSelectedIndex, entry: EntriesA[iSelectedIndex], keyboardOrMouse: aiKeyboardOrMouse});
-			return;
-		}
-		dispatchEvent({type: "listPress"});
-	}
-
-	function onItemPressAux(aiKeyboardOrMouse: Number, aiButtonIndex: Number)
-	{
-		if (!bDisableInput && !bDisableSelection && iSelectedIndex != -1 && aiButtonIndex == 1) 
-			dispatchEvent({type: "itemPressAux", index: iSelectedIndex, entry: EntriesA[iSelectedIndex], keyboardOrMouse: aiKeyboardOrMouse});
-	}
-
-	function SetEntry(aEntryClip: MovieClip, aEntryObject: Object): Void
-	{
-		if (aEntryClip != undefined) {
-			if (aEntryObject == selectedEntry) 
-				aEntryClip.gotoAndStop("Selected");
-			else 
-				aEntryClip.gotoAndStop("Normal");
-			SetEntryText(aEntryClip, aEntryObject);
-		}
-	}
-
-	function SetEntryText(aEntryClip: MovieClip, aEntryObject: Object): Void
-	{
-		if (aEntryClip.textField != undefined) {
-			if (textOption == Shared.BSScrollingList.TEXT_OPTION_SHRINK_TO_FIT) 
-				aEntryClip.textField.textAutoSize = "shrink";
-			else if (textOption == Shared.BSScrollingList.TEXT_OPTION_MULTILINE) 
-				aEntryClip.textField.verticalAutoSize = "top";
-			if (aEntryObject.text == undefined) 
-				aEntryClip.textField.SetText(" ");
-			else 
-				aEntryClip.textField.SetText(aEntryObject.text);
-			if (aEntryObject.enabled != undefined) 
-				aEntryClip.textField.textColor = aEntryObject.enabled == false ? 0x606060 : 0xFFFFFF;
-			if (aEntryObject.disabled != undefined) 
-				aEntryClip.textField.textColor = aEntryObject.disabled == true ? 0x606060 : 0xFFFFFF;
-		}
-	}
-
-	function SetPlatform(aiPlatform: Number, abPS3Switch: Boolean): Void
-	{
-		iPlatform = aiPlatform;
-		bMouseDrivenNav = iPlatform == Shared.Platforms.CONTROLLER_PC;
-	}
-
-	function onScroll(event: Object): Void
-	{
-		updateScrollPosition(Math.floor(event.position + 0.5));
-	}
-
+   static var TEXT_OPTION_NONE = 0;
+   static var TEXT_OPTION_SHRINK_TO_FIT = 1;
+   static var TEXT_OPTION_MULTILINE = 2;
+   function BSScrollingList()
+   {
+      super();
+      this.EntriesA = new Array();
+      this.bDisableSelection = false;
+      this.bDisableInput = false;
+      this.bMouseDrivenNav = false;
+      gfx.events.EventDispatcher.initialize(this);
+      Mouse.addListener(this);
+      this.iSelectedIndex = -1;
+      this.iScrollPosition = 0;
+      this.iMaxScrollPosition = 0;
+      this.iListItemsShown = 0;
+      this.iPlatform = 1;
+      this.fListHeight = this.border._height;
+      this.ListScrollbar = this.scrollbar;
+      this.iMaxItemsShown = 0;
+      var _loc3_ = this.GetClipByIndex(this.iMaxItemsShown);
+      while(_loc3_ != undefined)
+      {
+         _loc3_.clipIndex = this.iMaxItemsShown;
+         _loc3_.onRollOver = function()
+         {
+            if(!this._parent.listAnimating && !this._parent.bDisableInput && this.itemIndex != undefined)
+            {
+               this._parent.doSetSelectedIndex(this.itemIndex,0);
+               this._parent.bMouseDrivenNav = true;
+            }
+         };
+         _loc3_.onPress = function(aiMouseIndex, aiKeyboardOrMouse)
+         {
+            if(this.itemIndex != undefined)
+            {
+               this._parent.onItemPress(aiKeyboardOrMouse);
+               if(!this._parent.bDisableInput && this.onMousePress != undefined)
+               {
+                  this.onMousePress();
+               }
+            }
+         };
+         _loc3_.onPressAux = function(aiMouseIndex, aiKeyboardOrMouse, aiButtonIndex)
+         {
+            if(this.itemIndex != undefined)
+            {
+               this._parent.onItemPressAux(aiKeyboardOrMouse,aiButtonIndex);
+            }
+         };
+         _loc3_ = this.GetClipByIndex(this.iMaxItemsShown = this.iMaxItemsShown + 1);
+      }
+   }
+   function onLoad()
+   {
+      if(this.ListScrollbar != undefined)
+      {
+         this.ListScrollbar.position = 0;
+         this.ListScrollbar.addEventListener("scroll",this,"onScroll");
+      }
+   }
+   function ClearList()
+   {
+      this.EntriesA.splice(0,this.EntriesA.length);
+   }
+   function GetClipByIndex(aiIndex)
+   {
+      return this["Entry" + aiIndex];
+   }
+   function handleInput(details, pathToFocus)
+   {
+      var _loc2_ = false;
+      if(!this.bDisableInput)
+      {
+         var _loc4_ = this.GetClipByIndex(this.__get__selectedIndex() - this.__get__scrollPosition());
+         _loc2_ = _loc4_ != undefined && _loc4_.handleInput != undefined && _loc4_.handleInput(details,pathToFocus.slice(1));
+         if(!_loc2_ && Shared.GlobalFunc.IsKeyPressed(details))
+         {
+            if(details.navEquivalent == gfx.ui.NavigationCode.UP)
+            {
+               this.moveSelectionUp();
+               _loc2_ = true;
+            }
+            else if(details.navEquivalent == gfx.ui.NavigationCode.DOWN)
+            {
+               this.moveSelectionDown();
+               _loc2_ = true;
+            }
+            else if(!this.bDisableSelection && details.navEquivalent == gfx.ui.NavigationCode.ENTER)
+            {
+               this.onItemPress();
+               _loc2_ = true;
+            }
+         }
+      }
+      return _loc2_;
+   }
+   function onMouseWheel(delta)
+   {
+      if(!this.bDisableInput)
+      {
+         var _loc2_ = Mouse.getTopMostEntity();
+         while(_loc2_ && _loc2_ != undefined)
+         {
+            if(_loc2_ == this)
+            {
+               this.doSetSelectedIndex(-1,0);
+               if(delta < 0)
+               {
+                  this.__set__scrollPosition(this.__get__scrollPosition() + 1);
+               }
+               else if(delta > 0)
+               {
+                  this.__set__scrollPosition(this.__get__scrollPosition() - 1);
+               }
+            }
+            _loc2_ = _loc2_._parent;
+         }
+      }
+   }
+   function __get__selectedIndex()
+   {
+      return this.iSelectedIndex;
+   }
+   function __set__selectedIndex(aiNewIndex)
+   {
+      this.doSetSelectedIndex(aiNewIndex);
+      return this.__get__selectedIndex();
+   }
+   function __get__listAnimating()
+   {
+      return this.bListAnimating;
+   }
+   function __set__listAnimating(abFlag)
+   {
+      this.bListAnimating = abFlag;
+      return this.__get__listAnimating();
+   }
+   function doSetSelectedIndex(aiNewIndex, aiKeyboardOrMouse)
+   {
+      if(!this.bDisableSelection && aiNewIndex != this.iSelectedIndex)
+      {
+         var _loc2_ = this.iSelectedIndex;
+         this.iSelectedIndex = aiNewIndex;
+         if(_loc2_ != -1)
+         {
+            this.SetEntry(this.GetClipByIndex(this.EntriesA[_loc2_].clipIndex),this.EntriesA[_loc2_]);
+         }
+         if(this.iSelectedIndex != -1)
+         {
+            if(this.iPlatform != Shared.Platforms.CONTROLLER_PC)
+            {
+               if(this.iSelectedIndex < this.iScrollPosition)
+               {
+                  this.__set__scrollPosition(this.iSelectedIndex);
+               }
+               else if(this.iSelectedIndex >= this.iScrollPosition + this.iListItemsShown)
+               {
+                  this.__set__scrollPosition(Math.min(this.iSelectedIndex - this.iListItemsShown + 1,this.iMaxScrollPosition));
+               }
+               else
+               {
+                  this.SetEntry(this.GetClipByIndex(this.EntriesA[this.iSelectedIndex].clipIndex),this.EntriesA[this.iSelectedIndex]);
+               }
+            }
+            else
+            {
+               this.SetEntry(this.GetClipByIndex(this.EntriesA[this.iSelectedIndex].clipIndex),this.EntriesA[this.iSelectedIndex]);
+            }
+         }
+         this.dispatchEvent({type:"selectionChange",index:this.iSelectedIndex,keyboardOrMouse:aiKeyboardOrMouse});
+      }
+   }
+   function __get__scrollPosition()
+   {
+      return this.iScrollPosition;
+   }
+   function __get__maxScrollPosition()
+   {
+      return this.iMaxScrollPosition;
+   }
+   function __set__scrollPosition(aiNewPosition)
+   {
+      if(aiNewPosition != this.iScrollPosition && aiNewPosition >= 0 && aiNewPosition <= this.iMaxScrollPosition)
+      {
+         if(this.ListScrollbar == undefined)
+         {
+            this.updateScrollPosition(aiNewPosition);
+         }
+         else
+         {
+            this.ListScrollbar.position = aiNewPosition;
+         }
+      }
+      return this.__get__scrollPosition();
+   }
+   function updateScrollPosition(aiPosition)
+   {
+      this.iScrollPosition = aiPosition;
+      this.UpdateList();
+   }
+   function __get__selectedEntry()
+   {
+      return this.EntriesA[this.iSelectedIndex];
+   }
+   function __get__entryList()
+   {
+      return this.EntriesA;
+   }
+   function __set__entryList(anewArray)
+   {
+      this.EntriesA = anewArray;
+      return this.__get__entryList();
+   }
+   function __get__disableSelection()
+   {
+      return this.bDisableSelection;
+   }
+   function __set__disableSelection(abFlag)
+   {
+      this.bDisableSelection = abFlag;
+      return this.__get__disableSelection();
+   }
+   function __get__disableInput()
+   {
+      return this.bDisableInput;
+   }
+   function __set__disableInput(abFlag)
+   {
+      this.bDisableInput = abFlag;
+      return this.__get__disableInput();
+   }
+   function __get__maxEntries()
+   {
+      return this.iMaxItemsShown;
+   }
+   function __get__textOption()
+   {
+      return this.iTextOption;
+   }
+   function __set__textOption(strNewOption)
+   {
+      if(strNewOption == "None")
+      {
+         this.iTextOption = Shared.BSScrollingList.TEXT_OPTION_NONE;
+      }
+      else if(strNewOption == "Shrink To Fit")
+      {
+         this.iTextOption = Shared.BSScrollingList.TEXT_OPTION_SHRINK_TO_FIT;
+      }
+      else if(strNewOption == "Multi-Line")
+      {
+         this.iTextOption = Shared.BSScrollingList.TEXT_OPTION_MULTILINE;
+      }
+      return this.__get__textOption();
+   }
+   function UpdateList()
+   {
+      var _loc6_ = this.GetClipByIndex(0)._y;
+      var _loc4_ = 0;
+      var _loc2_ = 0;
+      while(_loc2_ < this.iScrollPosition)
+      {
+         this.EntriesA[_loc2_].clipIndex = undefined;
+         _loc2_ = _loc2_ + 1;
+      }
+      this.iListItemsShown = 0;
+      _loc2_ = this.iScrollPosition;
+      while(_loc2_ < this.EntriesA.length && this.iListItemsShown < this.iMaxItemsShown && _loc4_ <= this.fListHeight)
+      {
+         var _loc3_ = this.GetClipByIndex(this.iListItemsShown);
+         this.SetEntry(_loc3_,this.EntriesA[_loc2_]);
+         this.EntriesA[_loc2_].clipIndex = this.iListItemsShown;
+         _loc3_.itemIndex = _loc2_;
+         _loc3_._y = _loc6_ + _loc4_;
+         _loc3_._visible = true;
+         _loc4_ = _loc4_ + _loc3_._height;
+         if(_loc4_ <= this.fListHeight && this.iListItemsShown < this.iMaxItemsShown)
+         {
+            this.iListItemsShown = this.iListItemsShown + 1;
+         }
+         _loc2_ = _loc2_ + 1;
+      }
+      var _loc5_ = this.iListItemsShown;
+      while(_loc5_ < this.iMaxItemsShown)
+      {
+         this.GetClipByIndex(_loc5_)._visible = false;
+         _loc5_ = _loc5_ + 1;
+      }
+      if(this.ScrollUp != undefined)
+      {
+         this.ScrollUp._visible = this.__get__scrollPosition() > 0;
+      }
+      if(this.ScrollDown != undefined)
+      {
+         this.ScrollDown._visible = this.__get__scrollPosition() < this.iMaxScrollPosition;
+      }
+   }
+   function InvalidateData()
+   {
+      var _loc2_ = this.iMaxScrollPosition;
+      this.fListHeight = this.border._height;
+      this.CalculateMaxScrollPosition();
+      if(this.ListScrollbar != undefined)
+      {
+         if(_loc2_ == this.iMaxScrollPosition)
+         {
+            this.SetScrollbarVisibility();
+         }
+         else
+         {
+            this.ListScrollbar._visible = false;
+            this.ListScrollbar.setScrollProperties(this.iMaxItemsShown,0,this.iMaxScrollPosition);
+            if(this.iScrollbarDrawTimerID != undefined)
+            {
+               clearInterval(this.iScrollbarDrawTimerID);
+            }
+            this.iScrollbarDrawTimerID = setInterval(this,"SetScrollbarVisibility",50);
+         }
+      }
+      if(this.iSelectedIndex >= this.EntriesA.length)
+      {
+         this.iSelectedIndex = this.EntriesA.length - 1;
+      }
+      if(this.iScrollPosition > this.iMaxScrollPosition)
+      {
+         this.iScrollPosition = this.iMaxScrollPosition;
+      }
+      this.UpdateList();
+   }
+   function SetScrollbarVisibility()
+   {
+      clearInterval(this.iScrollbarDrawTimerID);
+      this.iScrollbarDrawTimerID = undefined;
+      this.ListScrollbar._visible = this.iMaxScrollPosition > 0;
+   }
+   function CalculateMaxScrollPosition()
+   {
+      var _loc3_ = 0;
+      var _loc2_ = this.EntriesA.length - 1;
+      while(_loc2_ >= 0 && _loc3_ <= this.fListHeight)
+      {
+         _loc3_ = _loc3_ + this.GetEntryHeight(_loc2_);
+         if(_loc3_ <= this.fListHeight)
+         {
+            _loc2_ = _loc2_ - 1;
+         }
+      }
+      this.iMaxScrollPosition = _loc2_ + 1;
+   }
+   function GetEntryHeight(aiEntryIndex)
+   {
+      var _loc2_ = this.GetClipByIndex(0);
+      this.SetEntry(_loc2_,this.EntriesA[aiEntryIndex]);
+      return _loc2_._height;
+   }
+   function moveSelectionUp()
+   {
+      if(!this.bDisableSelection)
+      {
+         if(this.__get__selectedIndex() > 0)
+         {
+            this.__set__selectedIndex(this.__get__selectedIndex() - 1);
+         }
+         return undefined;
+      }
+      this.__set__scrollPosition(this.__get__scrollPosition() - 1);
+   }
+   function moveSelectionDown()
+   {
+      if(!this.bDisableSelection)
+      {
+         if(this.__get__selectedIndex() < this.EntriesA.length - 1)
+         {
+            this.__set__selectedIndex(this.__get__selectedIndex() + 1);
+         }
+         return undefined;
+      }
+      this.__set__scrollPosition(this.__get__scrollPosition() + 1);
+   }
+   function onItemPress(aiKeyboardOrMouse)
+   {
+      if(!this.bDisableInput && !this.bDisableSelection && this.iSelectedIndex != -1)
+      {
+         this.dispatchEvent({type:"itemPress",index:this.iSelectedIndex,entry:this.EntriesA[this.iSelectedIndex],keyboardOrMouse:aiKeyboardOrMouse});
+         return undefined;
+      }
+      this.dispatchEvent({type:"listPress"});
+   }
+   function onItemPressAux(aiKeyboardOrMouse, aiButtonIndex)
+   {
+      if(!this.bDisableInput && !this.bDisableSelection && this.iSelectedIndex != -1 && aiButtonIndex == 1)
+      {
+         this.dispatchEvent({type:"itemPressAux",index:this.iSelectedIndex,entry:this.EntriesA[this.iSelectedIndex],keyboardOrMouse:aiKeyboardOrMouse});
+      }
+   }
+   function SetEntry(aEntryClip, aEntryObject)
+   {
+      if(aEntryClip != undefined)
+      {
+         if(aEntryObject == this.__get__selectedEntry())
+         {
+            aEntryClip.gotoAndStop("Selected");
+         }
+         else
+         {
+            aEntryClip.gotoAndStop("Normal");
+         }
+         this.SetEntryText(aEntryClip,aEntryObject);
+      }
+   }
+   function SetEntryText(aEntryClip, aEntryObject)
+   {
+      if(aEntryClip.textField != undefined)
+      {
+         if(this.__get__textOption() == Shared.BSScrollingList.TEXT_OPTION_SHRINK_TO_FIT)
+         {
+            aEntryClip.textField.textAutoSize = "shrink";
+         }
+         else if(this.__get__textOption() == Shared.BSScrollingList.TEXT_OPTION_MULTILINE)
+         {
+            aEntryClip.textField.verticalAutoSize = "top";
+         }
+         if(aEntryObject.text == undefined)
+         {
+            aEntryClip.textField.SetText(" ");
+         }
+         else
+         {
+            aEntryClip.textField.SetText(aEntryObject.text);
+         }
+         if(aEntryObject.enabled != undefined)
+         {
+            aEntryClip.textField.textColor = aEntryObject.enabled != false?16777215:6316128;
+         }
+         if(aEntryObject.disabled != undefined)
+         {
+            aEntryClip.textField.textColor = aEntryObject.disabled != true?16777215:6316128;
+         }
+      }
+   }
+   function SetPlatform(aiPlatform, abPS3Switch)
+   {
+      this.iPlatform = aiPlatform;
+      this.bMouseDrivenNav = this.iPlatform == Shared.Platforms.CONTROLLER_PC;
+   }
+   function onScroll(event)
+   {
+      this.updateScrollPosition(Math.floor(event.position + 0.5));
+   }
 }

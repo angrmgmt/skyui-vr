@@ -1,54 +1,37 @@
 class mx.transitions.Tween
 {
-   var obj;
-   var prop;
-   var begin;
-   var useSeconds;
-   var _time;
-   var prevTime;
-   var looping;
-   var _duration;
-   var _fps;
-   var isPlaying;
-   var prevPos;
-   var _pos;
-   var change;
-   var _intervalID;
-   var _startTime;
-
-   public var onMotionStarted;
-   public var onMotionFinished;
-   public var onMotionStopped;
-   public var onMotionLooped;
-   public var onMotionChanged;
-   public var onMotionResumed;
-
+   static var version = "1.1.0.52";
+   static var __initBeacon = mx.transitions.OnEnterFrameBeacon.init();
+   static var __initBroadcaster = mx.transitions.BroadcasterMX.initialize(mx.transitions.Tween.prototype,true);
    function Tween(obj, prop, func, begin, finish, duration, useSeconds)
    {
+      mx.transitions.OnEnterFrameBeacon.init();
       if(!arguments.length)
       {
-         return;
+         return undefined;
       }
       this.obj = obj;
       this.prop = prop;
       this.begin = begin;
-      this.position = begin;
-      this.duration = duration;
+      this.__set__position(begin);
+      this.__set__duration(duration);
       this.useSeconds = useSeconds;
       if(func)
       {
          this.func = func;
       }
-      this.finish = finish;
-      this.FPS = 30;
-      start();
+      this.__set__finish(finish);
+      this.__set__FPS(30);
+      this._listeners = [];
+      this.addListener(this);
+      this.start();
    }
-   function set time(t)
+   function __set__time(t)
    {
-      prevTime = _time;
-      if(t > this.duration)
+      this.prevTime = this._time;
+      if(t > this.__get__duration())
       {
-         if(looping)
+         if(this.looping)
          {
             this.rewind(t - this._duration);
             this.update();
@@ -81,22 +64,22 @@ class mx.transitions.Tween
          this._time = t;
          this.update();
       }
-      //return this.time;
+      return this.__get__time();
    }
-   function get time()
+   function __get__time()
    {
-      return _time;
+      return this._time;
    }
-   function set duration(d)
+   function __set__duration(d)
    {
-      _duration = !(d == null || d <= 0)?d:_global.Infinity;
-      //return this.duration;
+      this._duration = d == null || d <= 0?_global.Infinity:d;
+      return this.__get__duration();
    }
-   function get duration()
+   function __get__duration()
    {
-      return _duration;
+      return this._duration;
    }
-   function set FPS(fps)
+   function __set__FPS(fps)
    {
       var _loc2_ = this.isPlaying;
       this.stopEnterFrame();
@@ -105,16 +88,16 @@ class mx.transitions.Tween
       {
          this.startEnterFrame();
       }
-      //return this.__get__FPS();
+      return this.__get__FPS();
    }
    function __get__FPS()
    {
       return this._fps;
    }
-   function set position(p)
+   function __set__position(p)
    {
       this.setPosition(p);
-      //return this.__get__position();
+      return this.__get__position();
    }
    function setPosition(p)
    {
@@ -126,7 +109,7 @@ class mx.transitions.Tween
       }
       updateAfterEvent();
    }
-   function get position()
+   function __get__position()
    {
       return this.getPosition();
    }
@@ -138,37 +121,51 @@ class mx.transitions.Tween
       }
       return this.func(t,this.begin,this.change,this._duration);
    }
-   function set finish(f)
+   function __set__finish(f)
    {
       this.change = f - this.begin;
-      //return this.finish;
+      return this.__get__finish();
    }
-   function get finish()
+   function __get__finish()
    {
       return this.begin + this.change;
    }
    function continueTo(finish, duration)
    {
       this.begin = this.position;
-      this.finish = finish;
+      this.__set__finish(finish);
       if(duration != undefined)
       {
-         this.duration = duration;
+         this.__set__duration(duration);
       }
       this.start();
    }
    function yoyo()
    {
-      this.continueTo(this.begin,this.time);
+      this.continueTo(this.begin,this.__get__time());
    }
    function startEnterFrame()
    {
-      this._intervalID = setInterval(this,"onEnterFrame",1000 / this._fps);
+      if(this._fps == undefined)
+      {
+         _global.MovieClip.addListener(this);
+      }
+      else
+      {
+         this._intervalID = setInterval(this,"onEnterFrame",1000 / this._fps);
+      }
       this.isPlaying = true;
    }
    function stopEnterFrame()
    {
-      clearInterval(this._intervalID);
+      if(this._fps == undefined)
+      {
+         _global.MovieClip.removeListener(this);
+      }
+      else
+      {
+         clearInterval(this._intervalID);
+      }
       this.isPlaying = false;
    }
    function start()
@@ -199,24 +196,24 @@ class mx.transitions.Tween
    }
    function rewind(t)
    {
-      this._time = t != undefined?t:0;
+      this._time = t == undefined?0:t;
       this.fixTime();
       this.update();
    }
    function fforward()
    {
-      this.time = _duration;
+      this.__set__time(this._duration);
       this.fixTime();
    }
    function nextFrame()
    {
       if(this.useSeconds)
       {
-         this.time = (getTimer() - this._startTime) / 1000;
+         this.__set__time((getTimer() - this._startTime) / 1000);
       }
       else
       {
-         this.time = this._time + 1;
+         this.__set__time(this._time + 1);
       }
    }
    function onEnterFrame()
@@ -227,7 +224,7 @@ class mx.transitions.Tween
    {
       if(!this.useSeconds)
       {
-         this.time = this._time - 1;
+         this.__set__time(this._time - 1);
       }
    }
    function toString()
@@ -243,7 +240,7 @@ class mx.transitions.Tween
    }
    function update()
    {
-      this.position = getPosition(this._time);
+      this.__set__position(this.getPosition(this._time));
    }
    function func(t, b, c, d)
    {

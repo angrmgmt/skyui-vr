@@ -1,596 +1,441 @@
-﻿import gfx.io.GameDelegate;
-import gfx.ui.NavigationCode;
-import gfx.ui.InputDetails;
-import gfx.events.EventDispatcher;
-import gfx.managers.FocusHandler;
-import gfx.controls.Button;
-import Shared.GlobalFunc;
-
-import skyui.components.SearchWidget;
-import skyui.components.TabBar;
-import skyui.components.list.FilteredEnumeration;
-import skyui.components.list.BasicEnumeration;
-import skyui.components.list.TabularList;
-import skyui.components.list.SortedListHeader;
-import skyui.filter.ItemTypeFilter;
-import skyui.filter.NameFilter;
-import skyui.filter.SortFilter;
-import skyui.util.ConfigManager;
-import skyui.util.GlobalFunctions;
-import skyui.util.Translator;
-import skyui.util.DialogManager;
-import skyui.util.Debug;
-
-import skyui.defines.Input;
-
-
 class InventoryLists extends MovieClip
 {
-	#include "../version.as"
-
-  /* CONSTANTS */
-
-	static var HIDE_PANEL = 0;
-	static var SHOW_PANEL = 1;
-	static var TRANSITIONING_TO_HIDE_PANEL = 2;
-	static var TRANSITIONING_TO_SHOW_PANEL = 3;
-
-
-  /* STAGE ELEMENTS */
-
-	public var panelContainer: MovieClip;
-	public var zoomButtonHolder: MovieClip;
-
-
-  /* PRIVATE VARIABLES */
-
-	private var _typeFilter: ItemTypeFilter;
-	private var _nameFilter: NameFilter;
-	private var _sortFilter: SortFilter;
-
-	private var _platform: Number;
-
-	private var _currCategoryIndex: Number;
-	private var _savedSelectionIndex: Number = -1;
-
-	private var _searchKey: Number = -1;
-	private var _switchTabKey: Number = -1;
-	private var _sortOrderKey: Number = -1;
-	private var _sortOrderKeyHeld: Boolean = false;
-
-	private var _bTabbed = false;
-	private var _leftTabText: String;
-	private var _rightTabText: String;
-
-	private var _columnSelectDialog: MovieClip;
-	private var _columnSelectInterval: Number;
-	private var _categoryChanged: Boolean;
-	private var _categorySelections: Object;
-
-
-  /* PROPERTIES */
-
-	public var itemList: TabularList;
-
-	public var categoryList: CategoryList;
-
-	public var tabBar: TabBar;
-
-	public var searchWidget: SearchWidget;
-
-	public var categoryLabel: MovieClip;
-
-	public var columnSelectButton: Button;
-
-	private var _currentState: Number;
-
-	public function get currentState()
-	{
-		return _currentState;
-	}
-
-	public function set currentState(a_newState: Number)
-	{
-		if (a_newState == SHOW_PANEL)
-			FocusHandler.instance.setFocus(itemList,0);
-
-		_currentState = a_newState;
-	}
-
-	private var _tabBarIconArt: Array;
-
-	public function set tabBarIconArt(a_iconArt: Array)
-	{
-		_tabBarIconArt = a_iconArt;
-
-		if (tabBar)
-			tabBar.setIcons(_tabBarIconArt[0], _tabBarIconArt[1]);
-	}
-
-	public function get tabBarIconArt(): Array
-	{
-		return _tabBarIconArt;
-	}
-
-
-  /* INITIALIZATION */
-
-	public function InventoryLists()
-	{
-		super();
-
-		GlobalFunctions.addArrayFunctions();
-
-		EventDispatcher.initialize(this);
-
-		gotoAndStop("NoPanels");
-
-		GameDelegate.addCallBack("SetCategoriesList", this, "SetCategoriesList");
-		GameDelegate.addCallBack("InvalidateListData", this, "InvalidateListData");
-
-		_typeFilter = new ItemTypeFilter();
-		_nameFilter = new NameFilter();
-		_sortFilter = new SortFilter();
-
-		categoryList = panelContainer.categoryList;
-		categoryLabel = panelContainer.categoryLabel;
-		itemList = panelContainer.itemList;
-		searchWidget = panelContainer.searchWidget;
-		columnSelectButton = panelContainer.columnSelectButton;
-
-		ConfigManager.registerLoadCallback(this, "onConfigLoad");
-		ConfigManager.registerUpdateCallback(this, "onConfigUpdate");
-	}
-
-	private function onLoad(): Void
-	{
-		categoryList.listEnumeration = new BasicEnumeration(categoryList.entryList);
-
-		var listEnumeration = new FilteredEnumeration(itemList.entryList);
-		listEnumeration.addFilter(_typeFilter);
-		listEnumeration.addFilter(_nameFilter);
-		listEnumeration.addFilter(_sortFilter);
-		itemList.listEnumeration = listEnumeration;
-		// data processors are initialized by the top-level menu since they differ in each case
-
-		itemList.listState.maxTextLength = 80;
-
-		_typeFilter.addEventListener("filterChange", this, "onFilterChange");
-		_nameFilter.addEventListener("filterChange", this, "onFilterChange");
-		_sortFilter.addEventListener("filterChange", this, "onFilterChange");
-
-		categoryList.addEventListener("itemPress", this, "onCategoriesItemPress");
-		categoryList.addEventListener("itemPressAux", this, "onCategoriesItemPress");
-		categoryList.addEventListener("selectionChange", this, "onCategoriesListSelectionChange");
-
-		itemList.disableInput = false;
-
-		itemList.addEventListener("selectionChange", this, "onItemsListSelectionChange");
-		itemList.addEventListener("sortChange", this, "onSortChange");
-		itemList.addEventListener("listUpdated", this, "onItemsListUpdate");
-
-		searchWidget.addEventListener("inputStart", this, "onSearchInputStart");
-		searchWidget.addEventListener("inputEnd", this, "onSearchInputEnd");
-		searchWidget.addEventListener("inputChange", this, "onSearchInputChange");
-
-		columnSelectButton.addEventListener("press", this, "onColumnSelectButtonPress");
-	}
-
-
-  /* PUBLIC FUNCTIONS */
-
-	// @mixin by gfx.events.EventDispatcher
-	public var dispatchEvent: Function;
-	public var dispatchQueue: Function;
-	public var hasEventListener: Function;
-	public var addEventListener: Function;
-	public var removeEventListener: Function;
-	public var removeAllEventListeners: Function;
-	public var cleanUpEvents: Function;
-
-	// @mixin by Shared.GlobalFunc
-	public var Lock: Function;
-
-	public function InitExtensions(): Void
-	{
-		// Delay updates until config is ready
-		categoryList.suspended = true;
-		itemList.suspended = true;
-	}
-
-	public function showPanel(a_bPlayBladeSound: Boolean): Void
-	{
-		// Release itemlist for updating
-		categoryList.suspended = false;
-		itemList.suspended = false;
-
-		_currentState = TRANSITIONING_TO_SHOW_PANEL;
-		gotoAndPlay("PanelShow");
-
-		dispatchEvent({type:"categoryChange", index:categoryList.selectedIndex});
-
-		if (a_bPlayBladeSound != false)
-			GameDelegate.call("PlaySound",["UIMenuBladeOpenSD"]);
-	}
-
-	public function hidePanel(): Void
-	{
-		_currentState = TRANSITIONING_TO_HIDE_PANEL;
-		gotoAndPlay("PanelHide");
-		GameDelegate.call("PlaySound",["UIMenuBladeCloseSD"]);
-	}
-
-	public function enableTabBar(): Void
-	{
-		_bTabbed = true;
-		panelContainer.gotoAndPlay("tabbed");
-		itemList.listHeight = 480;
-	}
-
-	public function setPlatform(a_platform: Number, a_bPS3Switch: Boolean): Void
-	{
-		_platform = a_platform;
-
-		categoryList.setPlatform(a_platform,a_bPS3Switch);
-		itemList.setPlatform(a_platform,a_bPS3Switch);
-	}
-
-	// @GFx
-	public function handleInput(details: InputDetails, pathToFocus: Array): Boolean
-	{
-		if (_currentState != SHOW_PANEL)
-			return false;
-
-		if (_platform != 0) {
-			if (details.skseKeycode == _sortOrderKey) {
-				if (details.value == "keyDown") {
-					_sortOrderKeyHeld = true;
-
-					if (_columnSelectDialog)
-						DialogManager.close();
-					else
-						_columnSelectInterval = setInterval(this, "onColumnSelectButtonPress", 1000, {type: "timeout"});
-
-					return true;
-				} else if (details.value == "keyUp") {
-					_sortOrderKeyHeld = false;
-
-					if (_columnSelectInterval == undefined)
-						// keyPress handled: Key was released after the interval expired, don't process any further
-						return true;
-
-					// keyPress not handled: Clear intervals and change value to keyDown to be processed later
-					clearInterval(_columnSelectInterval);
-					delete(_columnSelectInterval);
-					// Continue processing the event as a normal keyDown event
-					details.value = "keyDown";
-				} else if (_sortOrderKeyHeld && details.value == "keyHold") {
-					// Fix for opening journal menu while key is depressed
-					// For some reason this is the only time we receive a keyHold event
-					_sortOrderKeyHeld = false;
-
-					if (_columnSelectDialog)
-						DialogManager.close();
-
-					return true;
-				}
-			}
-
-			if (_sortOrderKeyHeld) // Disable extra input while interval is active
-				return true;
-		}
-
-		if (GlobalFunc.IsKeyPressed(details)) {
-			// Search hotkey (default space)
-			if (details.skseKeycode == _searchKey) {
-				searchWidget.startInput();
-				return true;
-			}
-
-			// Toggle tab (default ALT)
-			if (tabBar != undefined && details.skseKeycode == _switchTabKey) {
-				tabBar.tabToggle();
-				return true;
-			}
-		}
-
-		if (categoryList.handleInput(details, pathToFocus))
-			return true;
-
-		var nextClip = pathToFocus.shift();
-		return nextClip.handleInput(details, pathToFocus);
-	}
-
-	public function getContentBounds():Array
-	{
-		var lb = panelContainer.ListBackground;
-		return [lb._x, lb._y, lb._width, lb._height];
-	}
-
-	public function showItemsList(): Void
-	{
-		// Save the previous selection in the category
-		var prevCategory = categoryList.lastSelectedIndex;
-		_categorySelections[prevCategory] = {
-			selectedIndex: itemList.selectedIndex,
-			scrollPosition: itemList.scrollPosition
-		};
-
-		_currCategoryIndex = categoryList.selectedIndex;
-
-		categoryLabel.textField.SetText(categoryList.selectedEntry.text);
-
-		// Start with no selection
-		itemList.selectedIndex = -1;
-		itemList.scrollPosition = 0;
-
-		if (categoryList.selectedEntry != undefined) {
-			// Set filter type
-			_typeFilter.changeFilterFlag(categoryList.selectedEntry.flag);
-
-			// Not set yet before the config is loaded
-			itemList.layout.changeFilterFlag(categoryList.selectedEntry.flag);
-		}
-
-		itemList.requestUpdate();
-
-		dispatchEvent({type:"itemHighlightChange", index:itemList.selectedIndex});
-
-		itemList.disableInput = false;
-	}
-
-	// Called to initially set the category list.
-	// @API
-	public function SetCategoriesList(): Void
-	{
-		var textOffset = 0;
-		var flagOffset = 1;
-		var bDontHideOffset = 2;
-		var len = 3;
-
-		categoryList.clearList();
-		_categorySelections = new Array();
-
-		for (var i = 0, index = 0; i < arguments.length; i = i + len, index++) {
-			var entry = {text:arguments[i + textOffset], flag:arguments[i + flagOffset], bDontHide:arguments[i + bDontHideOffset], savedItemIndex:0, filterFlag:arguments[i + bDontHideOffset] == true ? (1) : (0)};
-			categoryList.entryList.push(entry);
-
-			if (entry.flag == 0)
-				categoryList.dividerIndex = index;
-
-			_categorySelections.push(undefined);
-		}
-
-		// Initialize tabbar labels and replace text of segment heads (name -> ALL)
-		if (_bTabbed) {
-			// Restore 0 as default index for tabbed lists
-			categoryList.selectedIndex = 0;
-			_leftTabText = categoryList.entryList[0].text;
-			_rightTabText = categoryList.entryList[categoryList.dividerIndex + 1].text
-			categoryList.entryList[0].text = categoryList.entryList[categoryList.dividerIndex + 1].text = "$ALL";
-		}
-
-		categoryList.InvalidateData();
-	}
-
-	// Called whenever the underlying entryList data is updated (using an item, equipping etc.)
-	// @API
-	public function InvalidateListData(): Void
-	{
-		var flag = categoryList.selectedEntry.flag;
-
-		for (var i = 0; i < categoryList.entryList.length; i++)
-			categoryList.entryList[i].filterFlag = categoryList.entryList[i].bDontHide ? 1 : 0;
-
-		itemList.InvalidateData();
-
-		// Set filter flag = 1 for non-empty categories with bDontHideOffset=false
-		for (var i = 0; i < itemList.entryList.length; i++) {
-			for (var j = 0; j < categoryList.entryList.length; ++j) {
-				if (categoryList.entryList[j].filterFlag != 0)
-					continue;
-
-				if (itemList.entryList[i].filterFlag & categoryList.entryList[j].flag)
-					categoryList.entryList[j].filterFlag = 1;
-			}
-		}
-
-		categoryList.UpdateList();
-
-		if (flag != categoryList.selectedEntry.flag) {
-			// Triggers an update if filter flag changed
-			_typeFilter.itemFilter = categoryList.selectedEntry.flag;
-			dispatchEvent({type:"categoryChange", index:categoryList.selectedIndex});
-		}
-
-		// This is called when an ItemCard list closes(ex. ShowSoulGemList) to refresh ItemCard data
-		if (itemList.selectedIndex == -1)
-			dispatchEvent({type:"showItemsList", index: -1});
-		else
-			dispatchEvent({type:"itemHighlightChange", index:itemList.selectedIndex});
-	}
-
-
-  /* PRIVATE FUNCTIONS */
-
-  	private function onConfigLoad(event: Object): Void
-	{
-		var config = event.config;
-		_searchKey = config["Input"].controls.pc.search;
-
-		if (_platform == 0)
-			_switchTabKey = config["Input"].controls.pc.switchTab;
-		else {
-			_switchTabKey = config["Input"].controls.gamepad.switchTab;
-			_sortOrderKey = config["Input"].controls.gamepad.sortOrder;
-		}
-	}
-
-	private function onFilterChange(): Void
-	{
-		itemList.requestInvalidate();
-	}
-
-	private function onTabBarLoad(): Void
-	{
-		tabBar = panelContainer.tabBar;
-		tabBar.setIcons(_tabBarIconArt[0], _tabBarIconArt[1]);
-		tabBar.addEventListener("tabPress", this, "onTabPress");
-
-		if (categoryList.dividerIndex != -1)
-			tabBar.setLabelText(_leftTabText, _rightTabText);
-	}
-
-	private function onColumnSelectButtonPress(event: Object): Void
-	{
-		if (event.type == "timeout") {
-			clearInterval(_columnSelectInterval);
-			delete(_columnSelectInterval);
-		}
-
-		if (_columnSelectDialog) {
-			DialogManager.close();
-			return;
-		}
-
-		openColumnSelectDialog();
-	}
-
-	public function openColumnSelectDialog(): Void
-	{
-		// Don't do anything if the dialog is already opened
-		if (_columnSelectDialog) {
-			return;
-		}
-
-		// Setup and open the dialog
-		_savedSelectionIndex = itemList.selectedIndex;
-		itemList.selectedIndex = -1;
-
-		categoryList.disableSelection = categoryList.disableInput = true;
-		itemList.disableSelection = itemList.disableInput = true;
-		searchWidget.isDisabled = true;
-
-		_columnSelectDialog = DialogManager.open(panelContainer, "ColumnSelectDialog", {_x: 554, _y: 35, layout: itemList.layout});
-		_columnSelectDialog.addEventListener("dialogClosed", this, "onColumnSelectDialogClosed");
-	}
-
-	private function onColumnSelectDialogClosed(event: Object): Void
-	{
-		categoryList.disableSelection = categoryList.disableInput = false;
-		itemList.disableSelection = itemList.disableInput = false;
-		searchWidget.isDisabled = false;
-
-		itemList.selectedIndex = _savedSelectionIndex;
-	}
-
-	private function onConfigUpdate(event: Object): Void
-	{
-		itemList.layout.refresh();
-	}
-
-	private function onCategoriesItemPress(): Void
-	{
-		showItemsList();
-	}
-
-	public function toggleTab(): Void
-	{
-		var newTab = tabBar.activeTab == TabBar.LEFT_TAB ? TabBar.RIGHT_TAB : TabBar.LEFT_TAB;
-		switchTab(newTab);
-	}
-
-	public function switchTab(newTab: Number): Void
-	{
-		if (categoryList.disableSelection || categoryList.disableInput || itemList.disableSelection || itemList.disableInput)
-			return;
-
-		if (newTab == TabBar.LEFT_TAB) {
-			tabBar.activeTab = TabBar.LEFT_TAB;
-			categoryList.activeSegment = CategoryList.LEFT_SEGMENT;
-		} else if (newTab == TabBar.RIGHT_TAB) {
-			tabBar.activeTab = TabBar.RIGHT_TAB;
-			categoryList.activeSegment = CategoryList.RIGHT_SEGMENT;
-		}
-
-		GameDelegate.call("PlaySound",["UIMenuBladeOpenSD"]);
-		showItemsList();
-	}
-
-	private function onTabPress(event: Object): Void
-	{
-		switchTab(event.index);
-	}
-
-	private function onCategoriesListSelectionChange(event: Object): Void
-	{
-		_categoryChanged = true;
-		dispatchEvent({type:"categoryChange", index:event.index});
-
-		if (event.index != -1)
-			GameDelegate.call("PlaySound",["UIMenuFocus"]);
-	}
-
-	private function onItemsListSelectionChange(event: Object): Void
-	{
-		dispatchEvent({type:"itemHighlightChange", index:event.index});
-
-		if (event.index != -1)
-			GameDelegate.call("PlaySound",["UIMenuFocus"]);
-	}
-
-	private function onSortChange(event: Object): Void
-	{
-		_sortFilter.setSortBy(event.attributes, event.options);
-	}
-
-	private function onItemsListUpdate(): Void
-	{
-		if(!_categoryChanged)
-			return;
-
-		// The items list was just updated because the selected
-		// category changed.
-
-		// Restore the selected item and scroll position settings.
-		// This is needed because it's quite easy to accidentally
-		// switch catetory by accdient while using the VR trackpad.
-
-		// In these case, we want to be able to return to the previous
-		// category and retain our position in the list. If the scroll
-		// position always returned to the top of the list, this makes
-		// navigating large inventory lists very difficult.
-
-		// If we can find a previously saved selection setting for this
-		// category, restore it now.
-		var savedSelection = _categorySelections[_currCategoryIndex];
-		if(savedSelection != undefined) {
-			itemList.selectedIndex = savedSelection.selectedIndex;
-			itemList.scrollPosition = savedSelection.scrollPosition;
-		} else {
-			itemList.selectedIndex = -1;
-			itemList.scrollPosition = 0;
-		}
-
-		_categoryChanged = false;
-	}
-
-	private function onSearchInputStart(event: Object): Void
-	{
-		categoryList.disableSelection = categoryList.disableInput = true;
-		itemList.disableSelection = itemList.disableInput = true
-		_nameFilter.filterText = "";
-	}
-
-	private function onSearchInputChange(event: Object)
-	{
-		_nameFilter.filterText = event.data;
-	}
-
-	private function onSearchInputEnd(event: Object)
-	{
-		categoryList.disableSelection = categoryList.disableInput = false;
-		itemList.disableSelection = itemList.disableInput = false;
-		_nameFilter.filterText = event.data;
-	}
+   static var SKYUI_RELEASE_IDX = 2018;
+   static var SKYUI_VERSION_MAJOR = 5;
+   static var SKYUI_VERSION_MINOR = 2;
+   static var SKYUI_VERSION_STRING = InventoryLists.SKYUI_VERSION_MAJOR + "." + InventoryLists.SKYUI_VERSION_MINOR + " SE";
+   static var HIDE_PANEL = 0;
+   static var SHOW_PANEL = 1;
+   static var TRANSITIONING_TO_HIDE_PANEL = 2;
+   static var TRANSITIONING_TO_SHOW_PANEL = 3;
+   var _savedSelectionIndex = -1;
+   var _searchKey = -1;
+   var _switchTabKey = -1;
+   var _sortOrderKey = -1;
+   var _sortOrderKeyHeld = false;
+   var _bTabbed = false;
+   function InventoryLists()
+   {
+      super();
+      skyui.util.GlobalFunctions.addArrayFunctions();
+      gfx.events.EventDispatcher.initialize(this);
+      this.gotoAndStop("NoPanels");
+      gfx.io.GameDelegate.addCallBack("SetCategoriesList",this,"SetCategoriesList");
+      gfx.io.GameDelegate.addCallBack("InvalidateListData",this,"InvalidateListData");
+      this._typeFilter = new skyui.filter.ItemTypeFilter();
+      this._nameFilter = new skyui.filter.NameFilter();
+      this._sortFilter = new skyui.filter.SortFilter();
+      this.categoryList = this.panelContainer.categoryList;
+      this.categoryLabel = this.panelContainer.categoryLabel;
+      this.itemList = this.panelContainer.itemList;
+      this.searchWidget = this.panelContainer.searchWidget;
+      this.columnSelectButton = this.panelContainer.columnSelectButton;
+      skyui.util.ConfigManager.registerLoadCallback(this,"onConfigLoad");
+      skyui.util.ConfigManager.registerUpdateCallback(this,"onConfigUpdate");
+   }
+   function __get__currentState()
+   {
+      return this._currentState;
+   }
+   function __set__currentState(a_newState)
+   {
+      if(a_newState == InventoryLists.SHOW_PANEL)
+      {
+         gfx.managers.FocusHandler.__get__instance().setFocus(this.itemList,0);
+      }
+      this._currentState = a_newState;
+      return this.__get__currentState();
+   }
+   function __set__tabBarIconArt(a_iconArt)
+   {
+      this._tabBarIconArt = a_iconArt;
+      if(this.tabBar)
+      {
+         this.tabBar.setIcons(this._tabBarIconArt[0],this._tabBarIconArt[1]);
+      }
+      return this.__get__tabBarIconArt();
+   }
+   function __get__tabBarIconArt()
+   {
+      return this._tabBarIconArt;
+   }
+   function onLoad()
+   {
+      this.categoryList.listEnumeration = new skyui.components.list.BasicEnumeration(this.categoryList.__get__entryList());
+      var _loc2_ = new skyui.components.list.FilteredEnumeration(this.itemList.__get__entryList());
+      _loc2_.addFilter(this._typeFilter);
+      _loc2_.addFilter(this._nameFilter);
+      _loc2_.addFilter(this._sortFilter);
+      this.itemList.listEnumeration = _loc2_;
+      this.itemList.listState.maxTextLength = 80;
+      this._typeFilter.addEventListener("filterChange",this,"onFilterChange");
+      this._nameFilter.addEventListener("filterChange",this,"onFilterChange");
+      this._sortFilter.addEventListener("filterChange",this,"onFilterChange");
+      this.categoryList.addEventListener("itemPress",this,"onCategoriesItemPress");
+      this.categoryList.addEventListener("itemPressAux",this,"onCategoriesItemPress");
+      this.categoryList.addEventListener("selectionChange",this,"onCategoriesListSelectionChange");
+      this.itemList.disableInput = false;
+      this.itemList.addEventListener("selectionChange",this,"onItemsListSelectionChange");
+      this.itemList.addEventListener("sortChange",this,"onSortChange");
+      this.itemList.addEventListener("listUpdated",this,"onItemsListUpdate");
+      this.searchWidget.addEventListener("inputStart",this,"onSearchInputStart");
+      this.searchWidget.addEventListener("inputEnd",this,"onSearchInputEnd");
+      this.searchWidget.addEventListener("inputChange",this,"onSearchInputChange");
+      this.columnSelectButton.addEventListener("press",this,"onColumnSelectButtonPress");
+   }
+   function InitExtensions()
+   {
+      this.categoryList.__set__suspended(true);
+      this.itemList.__set__suspended(true);
+   }
+   function showPanel(a_bPlayBladeSound)
+   {
+      this.categoryList.__set__suspended(false);
+      this.itemList.__set__suspended(false);
+      this._currentState = InventoryLists.TRANSITIONING_TO_SHOW_PANEL;
+      this.gotoAndPlay("PanelShow");
+      this.dispatchEvent({type:"categoryChange",index:this.categoryList.__get__selectedIndex()});
+      if(a_bPlayBladeSound != false)
+      {
+         gfx.io.GameDelegate.call("PlaySound",["UIMenuBladeOpenSD"]);
+      }
+   }
+   function hidePanel()
+   {
+      this._currentState = InventoryLists.TRANSITIONING_TO_HIDE_PANEL;
+      this.gotoAndPlay("PanelHide");
+      gfx.io.GameDelegate.call("PlaySound",["UIMenuBladeCloseSD"]);
+   }
+   function enableTabBar()
+   {
+      this._bTabbed = true;
+      this.panelContainer.gotoAndPlay("tabbed");
+      this.itemList.__set__listHeight(480);
+   }
+   function setPlatform(a_platform, a_bPS3Switch)
+   {
+      this._platform = a_platform;
+      this.categoryList.setPlatform(a_platform,a_bPS3Switch);
+      this.itemList.setPlatform(a_platform,a_bPS3Switch);
+   }
+   function handleInput(details, pathToFocus)
+   {
+      if(this._currentState != InventoryLists.SHOW_PANEL)
+      {
+         return false;
+      }
+      if(this._platform != 0)
+      {
+         if(details.skseKeycode == this._sortOrderKey)
+         {
+            if(details.value == "keyDown")
+            {
+               this._sortOrderKeyHeld = true;
+               if(this._columnSelectDialog)
+               {
+                  skyui.util.DialogManager.close();
+               }
+               else
+               {
+                  this._columnSelectInterval = setInterval(this,"onColumnSelectButtonPress",1000,{type:"timeout"});
+               }
+               return true;
+            }
+            if(details.value == "keyUp")
+            {
+               this._sortOrderKeyHeld = false;
+               if(this._columnSelectInterval == undefined)
+               {
+                  return true;
+               }
+               clearInterval(this._columnSelectInterval);
+               delete this._columnSelectInterval;
+               details.value = "keyDown";
+            }
+            else if(this._sortOrderKeyHeld && details.value == "keyHold")
+            {
+               this._sortOrderKeyHeld = false;
+               if(this._columnSelectDialog)
+               {
+                  skyui.util.DialogManager.close();
+               }
+               return true;
+            }
+         }
+         if(this._sortOrderKeyHeld)
+         {
+            return true;
+         }
+      }
+      if(Shared.GlobalFunc.IsKeyPressed(details))
+      {
+         if(details.skseKeycode == this._searchKey)
+         {
+            this.searchWidget.startInput();
+            return true;
+         }
+         if(this.tabBar != undefined && details.skseKeycode == this._switchTabKey)
+         {
+            this.tabBar.tabToggle();
+            return true;
+         }
+      }
+      if(this.categoryList.handleInput(details,pathToFocus))
+      {
+         return true;
+      }
+      var _loc4_ = pathToFocus.shift();
+      return _loc4_.handleInput(details,pathToFocus);
+   }
+   function getContentBounds()
+   {
+      var _loc2_ = this.panelContainer.ListBackground;
+      return [_loc2_._x,_loc2_._y,_loc2_._width,_loc2_._height];
+   }
+   function showItemsList()
+   {
+      var _loc2_ = this.categoryList.lastSelectedIndex;
+      this._categorySelections[_loc2_] = {selectedIndex:this.itemList.__get__selectedIndex(),scrollPosition:this.itemList.__get__scrollPosition()};
+      this._currCategoryIndex = this.categoryList.selectedIndex;
+      this.categoryLabel.textField.SetText(this.categoryList.__get__selectedEntry().text);
+      this.itemList.__set__selectedIndex(-1);
+      this.itemList.__set__scrollPosition(0);
+      if(this.categoryList.__get__selectedEntry() != undefined)
+      {
+         this._typeFilter.changeFilterFlag(this.categoryList.__get__selectedEntry().flag);
+         this.itemList.__get__layout().changeFilterFlag(this.categoryList.__get__selectedEntry().flag);
+      }
+      this.itemList.requestUpdate();
+      this.dispatchEvent({type:"itemHighlightChange",index:this.itemList.__get__selectedIndex()});
+      this.itemList.disableInput = false;
+   }
+   function SetCategoriesList()
+   {
+      var _loc14_ = 0;
+      var _loc13_ = 1;
+      var _loc6_ = 2;
+      var _loc12_ = 3;
+      this.categoryList.clearList();
+      this._categorySelections = new Array();
+      var _loc3_ = 0;
+      var _loc5_ = 0;
+      while(_loc3_ < arguments.length)
+      {
+         var _loc4_ = {text:arguments[_loc3_ + _loc14_],flag:arguments[_loc3_ + _loc13_],bDontHide:arguments[_loc3_ + _loc6_],savedItemIndex:0,filterFlag:(arguments[_loc3_ + _loc6_] != true?0:1)};
+         this.categoryList.__get__entryList().push(_loc4_);
+         if(_loc4_.flag == 0)
+         {
+            this.categoryList.dividerIndex = _loc5_;
+         }
+         this._categorySelections.push(undefined);
+         _loc3_ = _loc3_ + _loc12_;
+         _loc5_;
+         _loc5_++;
+      }
+      if(this._bTabbed)
+      {
+         this.categoryList.__set__selectedIndex(0);
+         this._leftTabText = this.categoryList.__get__entryList()[0].text;
+         this._rightTabText = this.categoryList.__get__entryList()[this.categoryList.dividerIndex + 1].text;
+         this.categoryList.__get__entryList()[0].text = this.categoryList.__get__entryList()[this.categoryList.dividerIndex + 1].text = "$ALL";
+      }
+      this.categoryList.InvalidateData();
+   }
+   function InvalidateListData()
+   {
+      var _loc4_ = this.categoryList.__get__selectedEntry().flag;
+      var _loc3_ = 0;
+      while(_loc3_ < this.categoryList.__get__entryList().length)
+      {
+         this.categoryList.__get__entryList()[_loc3_].filterFlag = !this.categoryList.__get__entryList()[_loc3_].bDontHide?0:1;
+         _loc3_ = _loc3_ + 1;
+      }
+      this.itemList.InvalidateData();
+      _loc3_ = 0;
+      while(_loc3_ < this.itemList.__get__entryList().length)
+      {
+         var _loc2_ = 0;
+         while(_loc2_ < this.categoryList.__get__entryList().length)
+         {
+            if(this.categoryList.__get__entryList()[_loc2_].filterFlag == 0)
+            {
+               if(this.itemList.__get__entryList()[_loc3_].filterFlag & this.categoryList.__get__entryList()[_loc2_].flag)
+               {
+                  this.categoryList.__get__entryList()[_loc2_].filterFlag = 1;
+               }
+            }
+            _loc2_ = _loc2_ + 1;
+         }
+         _loc3_ = _loc3_ + 1;
+      }
+      this.categoryList.UpdateList();
+      if(_loc4_ != this.categoryList.__get__selectedEntry().flag)
+      {
+         this._typeFilter.itemFilter = this.categoryList.__get__selectedEntry().flag;
+         this.dispatchEvent({type:"categoryChange",index:this.categoryList.__get__selectedIndex()});
+      }
+      if(this.itemList.__get__selectedIndex() == -1)
+      {
+         this.dispatchEvent({type:"showItemsList",index:-1});
+      }
+      else
+      {
+         this.dispatchEvent({type:"itemHighlightChange",index:this.itemList.__get__selectedIndex()});
+      }
+   }
+   function onConfigLoad(event)
+   {
+      var _loc2_ = event.config;
+      this._searchKey = _loc2_.Input.controls.pc.search;
+      if(this._platform == 0)
+      {
+         this._switchTabKey = _loc2_.Input.controls.pc.switchTab;
+      }
+      else
+      {
+         this._switchTabKey = _loc2_.Input.controls.gamepad.switchTab;
+         this._sortOrderKey = _loc2_.Input.controls.gamepad.sortOrder;
+      }
+   }
+   function onFilterChange()
+   {
+      this.itemList.requestInvalidate();
+   }
+   function onTabBarLoad()
+   {
+      this.tabBar = this.panelContainer.tabBar;
+      this.tabBar.setIcons(this._tabBarIconArt[0],this._tabBarIconArt[1]);
+      this.tabBar.addEventListener("tabPress",this,"onTabPress");
+      if(this.categoryList.dividerIndex != -1)
+      {
+         this.tabBar.setLabelText(this._leftTabText,this._rightTabText);
+      }
+   }
+   function onColumnSelectButtonPress(event)
+   {
+      if(event.type == "timeout")
+      {
+         clearInterval(this._columnSelectInterval);
+         delete this._columnSelectInterval;
+      }
+      if(this._columnSelectDialog)
+      {
+         skyui.util.DialogManager.close();
+         return undefined;
+      }
+      this.openColumnSelectDialog();
+   }
+   function openColumnSelectDialog()
+   {
+      if(this._columnSelectDialog)
+      {
+         return undefined;
+      }
+      this._savedSelectionIndex = this.itemList.selectedIndex;
+      this.itemList.__set__selectedIndex(-1);
+      this.categoryList.disableSelection = this.categoryList.disableInput = true;
+      this.itemList.disableSelection = this.itemList.disableInput = true;
+      this.searchWidget.isDisabled = true;
+      this._columnSelectDialog = skyui.util.DialogManager.open(this.panelContainer,"ColumnSelectDialog",{_x:554,_y:35,layout:this.itemList.__get__layout()});
+      this._columnSelectDialog.addEventListener("dialogClosed",this,"onColumnSelectDialogClosed");
+   }
+   function onColumnSelectDialogClosed(event)
+   {
+      this.categoryList.disableSelection = this.categoryList.disableInput = false;
+      this.itemList.disableSelection = this.itemList.disableInput = false;
+      this.searchWidget.isDisabled = false;
+      this.itemList.__set__selectedIndex(this._savedSelectionIndex);
+   }
+   function onConfigUpdate(event)
+   {
+      this.itemList.__get__layout().refresh();
+   }
+   function onCategoriesItemPress()
+   {
+      this.showItemsList();
+   }
+   function toggleTab()
+   {
+      var _loc2_ = this.tabBar.__get__activeTab() != skyui.components.TabBar.LEFT_TAB?skyui.components.TabBar.LEFT_TAB:skyui.components.TabBar.RIGHT_TAB;
+      this.switchTab(_loc2_);
+   }
+   function switchTab(newTab)
+   {
+      if(this.categoryList.disableSelection || this.categoryList.disableInput || this.itemList.disableSelection || this.itemList.disableInput)
+      {
+         return undefined;
+      }
+      if(newTab == skyui.components.TabBar.LEFT_TAB)
+      {
+         this.tabBar.__set__activeTab(skyui.components.TabBar.LEFT_TAB);
+         this.categoryList.__set__activeSegment(CategoryList.LEFT_SEGMENT);
+      }
+      else if(newTab == skyui.components.TabBar.RIGHT_TAB)
+      {
+         this.tabBar.__set__activeTab(skyui.components.TabBar.RIGHT_TAB);
+         this.categoryList.__set__activeSegment(CategoryList.RIGHT_SEGMENT);
+      }
+      gfx.io.GameDelegate.call("PlaySound",["UIMenuBladeOpenSD"]);
+      this.showItemsList();
+   }
+   function onTabPress(event)
+   {
+      this.switchTab(event.index);
+   }
+   function onCategoriesListSelectionChange(event)
+   {
+      this._categoryChanged = true;
+      this.dispatchEvent({type:"categoryChange",index:event.index});
+      if(event.index != -1)
+      {
+         gfx.io.GameDelegate.call("PlaySound",["UIMenuFocus"]);
+      }
+   }
+   function onItemsListSelectionChange(event)
+   {
+      this.dispatchEvent({type:"itemHighlightChange",index:event.index});
+      if(event.index != -1)
+      {
+         gfx.io.GameDelegate.call("PlaySound",["UIMenuFocus"]);
+      }
+   }
+   function onSortChange(event)
+   {
+      this._sortFilter.setSortBy(event.attributes,event.options);
+   }
+   function onItemsListUpdate()
+   {
+      if(!this._categoryChanged)
+      {
+         return undefined;
+      }
+      var _loc2_ = this._categorySelections[this._currCategoryIndex];
+      if(_loc2_ != undefined)
+      {
+         this.itemList.__set__selectedIndex(_loc2_.selectedIndex);
+         this.itemList.__set__scrollPosition(_loc2_.scrollPosition);
+      }
+      else
+      {
+         this.itemList.__set__selectedIndex(-1);
+         this.itemList.__set__scrollPosition(0);
+      }
+      this._categoryChanged = false;
+   }
+   function onSearchInputStart(event)
+   {
+      this.categoryList.disableSelection = this.categoryList.disableInput = true;
+      this.itemList.disableSelection = this.itemList.disableInput = true;
+      this._nameFilter.__set__filterText("");
+   }
+   function onSearchInputChange(event)
+   {
+      this._nameFilter.__set__filterText(event.data);
+   }
+   function onSearchInputEnd(event)
+   {
+      this.categoryList.disableSelection = this.categoryList.disableInput = false;
+      this.itemList.disableSelection = this.itemList.disableInput = false;
+      this._nameFilter.__set__filterText(event.data);
+   }
 }
