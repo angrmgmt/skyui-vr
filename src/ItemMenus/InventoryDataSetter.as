@@ -54,7 +54,7 @@ class InventoryDataSetter extends ItemcardDataExtender
 				processArmorBaseId(a_entryObject);
 				
 				//Frostfall
-				//skse.Log("ListProcessed " + _listProcessed);
+				skse.Log("InventoryDataSetter - ListProcessed " + _listProcessed);
 				if (_listProcessed) {
 					skse.SendModEvent("Frost_OnSkyUIInvListGetEntryProtectionDataOnProcess", "", a_entryObject.itemIndex, 0);
 				}

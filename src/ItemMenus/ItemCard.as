@@ -223,7 +223,7 @@ class ItemCard extends MovieClip
 				SkillTextInstance.SetText(aUpdateObj.skillText);
 
 				//Frostfall
-				skse.Log("warmth " + currentList[currentListIndex].warmth + " coverage " + currentList[currentListIndex].coverage);
+				skse.Log("ItemCard - warmth " + currentList[currentListIndex].warmth + " coverage " + currentList[currentListIndex].coverage);
 				ExposureProtectionValue.text = currentList[currentListIndex].warmth === undefined ? "" : currentList[currentListIndex].warmth;
 				RainProtectionValue.text = currentList[currentListIndex].coverage === undefined ? "" : currentList[currentListIndex].coverage;
 				break;
