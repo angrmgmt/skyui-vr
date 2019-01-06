@@ -138,6 +138,16 @@ class BarterMenu extends ItemMenu
 			a_updateObj.value = a_updateObj.value * _sellMult;
 		}
 		a_updateObj.value = Math.floor(a_updateObj.value + 0.5);
+
+		//Frostfall
+		var selectedEntry = inventoryLists.itemList.selectedEntry;
+		if (selectedEntry !== undefined) {
+			a_updateObj["warmth"] = selectedEntry.warmth;
+			a_updateObj["coverage"] = selectedEntry.coverage;
+			a_updateObj["currentArmorWarmth"] = selectedEntry.currentArmorWarmth;
+			a_updateObj["currentArmorCoverage"] = selectedEntry.currentArmorCoverage;
+		}
+
 		itemCard.itemInfo = a_updateObj;
 		bottomBar.updateBarterPerItemInfo(a_updateObj);
 	}

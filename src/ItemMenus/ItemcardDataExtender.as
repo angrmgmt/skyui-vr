@@ -16,7 +16,7 @@ class ItemcardDataExtender implements IListProcessor
 	
 	//Frostfall
 	private var _listProcessed: Boolean;
-
+	
 	
   /* INITIALIZATION */
 	
@@ -44,7 +44,7 @@ class ItemcardDataExtender implements IListProcessor
 	{
 		//Frostfall
 		_listProcessed = false;
-
+		
 		var entryList = a_list.entryList;
 		
 		for (var i = 0; i < entryList.length; i++) {

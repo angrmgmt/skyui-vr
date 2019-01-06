@@ -18,9 +18,9 @@ import flash.utils.getTimer;
 class ContainerMenu extends ItemMenu
 {
 	#include "../version.as"
-
+	
   /* CONSTANTS */
-
+  
 	private static var NULL_HAND: Number = -1;
 	private static var RIGHT_HAND: Number = 0;
 	private static var LEFT_HAND: Number = 1;
@@ -43,10 +43,10 @@ class ContainerMenu extends ItemMenu
 
 
   /* PROPERTIES */
-
+	
 	// @API
 	public var bNPCMode: Boolean = false;
-
+	
 	// @override ItemMenu
 	public var bEnableTabs: Boolean = true;
 
@@ -64,11 +64,11 @@ class ContainerMenu extends ItemMenu
 
 
   /* PUBLIC FUNCTIONS */
-
+  
 	public function InitExtensions(): Void
 	{
 		super.InitExtensions();
-
+		
 		inventoryLists.tabBarIconArt = _tabBarIconArt;
 
 		// Initialize menu-specific list components
@@ -94,14 +94,14 @@ class ContainerMenu extends ItemMenu
 		itemList.addDataProcessor(new InventoryDataSetter());
 		itemList.addDataProcessor(new InventoryIconSetter(a_config["Appearance"]));
 		itemList.addDataProcessor(new PropertyDataExtender(a_config["Appearance"], a_config["Properties"], "itemProperties", "itemIcons", "itemCompoundProperties"));
-
+		
 		var layout: ListLayout = ListLayoutManager.createLayout(a_config["ListLayout"], "ItemListLayout");
 		itemList.layout = layout;
 
 		// Not 100% happy with doing this here, but has to do for now.
 		if (inventoryLists.categoryList.selectedEntry)
 			layout.changeFilterFlag(inventoryLists.categoryList.selectedEntry.flag);
-
+			
 		_equipModeKey = a_config["Input"].controls.pc.equipMode;
 		_equipModeControls = {keyCode: _equipModeKey};
 	}
@@ -207,7 +207,7 @@ class ContainerMenu extends ItemMenu
 	public function Vanilla_AttemptEquip(a_slot: Number, a_bCheckOverList: Boolean): Void
 	{
 		var bCheckOverList = a_bCheckOverList == undefined ? true : a_bCheckOverList;
-
+		
 		if (!shouldProcessItemsListInput(bCheckOverList) || !confirmSelectedEntry())
 			return;
 
@@ -260,7 +260,7 @@ class ContainerMenu extends ItemMenu
 		// If we are zoomed into an item, do nothing
 		if (!bFadedIn)
 			return;
-
+		
 		if (isViewingContainer() && !bNPCMode)
 			GameDelegate.call("TakeAllItems",[]);
 
@@ -271,8 +271,17 @@ class ContainerMenu extends ItemMenu
 			startItemTransfer();
 	}
 
-  /* PRIVATE FUNCTIONS */
+	// @API
+	public function SetPlatform(a_platform: Number, a_bPS3Switch: Boolean): Void
+	{
+		super.SetPlatform(a_platform,a_bPS3Switch);
 
+		_bEquipMode = (a_platform != 0);
+	}
+	
+	
+  /* PRIVATE FUNCTIONS */
+  
 	private function onItemSelect(event: Object): Void
 	{
 		if (event.keyboardOrMouse != 0) {
@@ -290,7 +299,7 @@ class ContainerMenu extends ItemMenu
 		if (event.menu == "quantity")
 			GameDelegate.call("QuantitySliderOpen", [event.opening]);
 	}
-
+  
 	// @override ItemMenu
 	private function onItemHighlightChange(event: Object): Void
 	{
@@ -340,7 +349,7 @@ class ContainerMenu extends ItemMenu
 
 		GameDelegate.call("DisabledItemSelect",[]);
 	}
-
+	
 	// @override ItemMenu
 	private function updateBottomBar(a_bSelected: Boolean): Void
 	{
@@ -407,7 +416,7 @@ class ContainerMenu extends ItemMenu
 				navPanel.addButton({text: "$Take All", controls: takeAllControl});
 
 		}
-
+		
 		navPanel.updateButtons(true);
 	}
 
@@ -441,7 +450,7 @@ class ContainerMenu extends ItemMenu
 		if (!checkBook(inventoryLists.itemList.selectedEntry))
 			checkPoison(inventoryLists.itemList.selectedEntry);
 	}
-
+	
 	private function isViewingContainer(): Boolean
 	{
 		return (inventoryLists.categoryList.activeSegment == 0);

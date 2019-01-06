@@ -15,136 +15,137 @@ import skyui.defines.Item;
 class ItemMenu extends MovieClip
 {
   /* PRIVATE VARIABLES */
-
+  
 	private var _platform: Number;
 	private var _bItemCardFadedIn: Boolean = false;
 	private var _bItemCardPositioned: Boolean = false;
-
+	
 	private var _quantityMinCount: Number = 5;
-
+	
 	private var _config: Object;
-
+	
 	private var _bPlayBladeSound: Boolean;
-
+	
 	private var _searchKey: Number;
 	private var _switchTabKey: Number;
-
+	
 	private var _acceptControls: Object;
 	private var _cancelControls: Object;
 	private var _searchControls: Object;
 	private var _switchControls: Object;
 	private var _sortColumnControls: Array;
 	private var _sortOrderControls: Object;
-
+	
 	//Frostfall
 	private var _fetchedRanges: Array;
 	private var _fetchedChangeRanges: Array;
-
+	
+	
   /* STAGE ELEMENTS */
-
+	
 	public var inventoryLists: InventoryLists;
-
+	
 	public var itemCardFadeHolder: MovieClip;
 
 	public var bottomBar: BottomBar;
-
+	
 	public var mouseRotationRect: MovieClip;
 	public var exitMenuRect: MovieClip;
-
-
+	
+	
   /* PROPERTIES */
-
+	
 	public var itemCard: MovieClip;
-
+	
 	public var navPanel: ButtonPanel;
-
+	
 	public var bEnableTabs: Boolean = false;
-
+	
 	// @GFx
 	public var bPCControlsReady: Boolean = true;
-
+	
 	public var bFadedIn: Boolean = true;
-
-
+	
+	
   /* INITIALIZATION */
 
 	public function ItemMenu()
 	{
 		super();
-
+		
 		itemCard = itemCardFadeHolder.ItemCard_mc;
 		navPanel = bottomBar.buttonPanel;
-
+		
 		Mouse.addListener(this);
 		ConfigManager.registerLoadCallback(this, "onConfigLoad");
-
+		
 		bFadedIn = true;
 		_bItemCardFadedIn = false;
 	}
 
   /* PUBLIC FUNCTIONS */
-
+  
 	// @API
 	public function InitExtensions(a_bPlayBladeSound): Void
 	{
 		skse.ExtendData(true);
 		skse.ForceContainerCategorization(true);
-
+		
 		_bPlayBladeSound = a_bPlayBladeSound
-
+		
 		inventoryLists.InitExtensions();
-
+		
 		if (bEnableTabs)
 			inventoryLists.enableTabBar();
-
+		
 		GameDelegate.addCallBack("UpdatePlayerInfo",this,"UpdatePlayerInfo");
 		GameDelegate.addCallBack("UpdateItemCardInfo",this,"UpdateItemCardInfo");
 		GameDelegate.addCallBack("ToggleMenuFade",this,"ToggleMenuFade");
 		GameDelegate.addCallBack("RestoreIndices",this,"RestoreIndices");
-
+		
 		inventoryLists.addEventListener("categoryChange",this,"onCategoryChange");
 		inventoryLists.addEventListener("itemHighlightChange",this,"onItemHighlightChange");
 		inventoryLists.addEventListener("showItemsList",this,"onShowItemsList");
 		inventoryLists.addEventListener("hideItemsList",this,"onHideItemsList");
-
+		
 		inventoryLists.itemList.addEventListener("itemPress", this ,"onItemSelect");
-
+		
 		itemCard.addEventListener("quantitySelect",this,"onQuantityMenuSelect");
 		itemCard.addEventListener("subMenuAction",this,"onItemCardSubMenuAction");
-
+		
 		//Frostfall
 		_fetchedRanges = [];
 		_fetchedChangeRanges = [];
 		itemCard.currentList = inventoryLists.itemList.entryList;
 		//skse.Log("currentList " + itemCard.currentList);
-
+		
 		positionFixedElements();
-
+		
 		itemCard._visible = false;
 		navPanel.hideButtons();
-
+		
 		exitMenuRect.onMouseDown = function()
 		{
 			if (_parent.bFadedIn == true && Mouse.getTopMostEntity() == this)
 				_parent.onExitMenuRectClick();
 		};
 	}
-
+	
 	public function setConfig(a_config: Object): Void
 	{
 		_config = a_config;
-
+		
 		positionFloatingElements();
-
+		
 		var itemListState = inventoryLists.itemList.listState;
 		var categoryListState = inventoryLists.categoryList.listState;
 		var appearance = a_config["Appearance"];
-
+		
 		categoryListState.iconSource = appearance.icons.category.source;
-
+		
 		itemListState.iconSource = appearance.icons.item.source;
 		itemListState.showStolenIcon = appearance.icons.item.showStolen;
-
+		
 		itemListState.defaultEnabledColor = appearance.colors.text.enabled;
 		itemListState.negativeEnabledColor = appearance.colors.negative.enabled;
 		itemListState.stolenEnabledColor = appearance.colors.stolen.enabled;
@@ -153,12 +154,12 @@ class ItemMenu extends MovieClip
 		itemListState.stolenDisabledColor = appearance.colors.stolen.disabled;
 
 		_quantityMinCount = a_config["ItemList"].quantityMenu.minCount;
-
+		
 		if (_platform == 0) {
 			_switchTabKey = a_config["Input"].controls.pc.switchTab;
 		} else {
 			_switchTabKey = a_config["Input"].controls.gamepad.switchTab;
-
+			
 			var previousColumnKey = a_config["Input"].controls.gamepad.prevColumn;
 			var nextColumnKey = a_config["Input"].controls.gamepad.nextColumn;
 			var sortOrderKey = a_config["Input"].controls.gamepad.sortOrder;
@@ -166,12 +167,12 @@ class ItemMenu extends MovieClip
 								   {keyCode: nextColumnKey}];
 			_sortOrderControls = {keyCode: sortOrderKey};
 		}
-
+		
 		_switchControls = {keyCode: _switchTabKey};
-
+		
 		_searchKey = a_config["Input"].controls.pc.search;
 		_searchControls = {keyCode: _searchKey};
-
+		
 		updateBottomBar(false);
 	}
 
@@ -179,26 +180,26 @@ class ItemMenu extends MovieClip
 	public function SetPlatform(a_platform: Number, a_bPS3Switch: Boolean): Void
 	{
 		_platform = a_platform;
-
+		
 		if (a_platform == 0) {
 			_acceptControls = Input.Enter;
 			_cancelControls = Input.Tab;
-
+			
 			// Defaults
 			_switchControls = Input.Alt;
 		} else {
 			_acceptControls = Input.Accept;
 			_cancelControls = Input.Cancel;
-
+			
 			// Defaults
 			_switchControls = Input.GamepadBack;
 			_sortColumnControls = Input.SortColumn;
 			_sortOrderControls = Input.SortOrder;
 		}
-
+		
 		// Defaults
 		_searchControls = Input.Space;
-
+		
 		inventoryLists.setPlatform(a_platform,a_bPS3Switch);
 		itemCard.SetPlatform(a_platform,a_bPS3Switch);
 		bottomBar.setPlatform(a_platform,a_bPS3Switch);
@@ -215,12 +216,12 @@ class ItemMenu extends MovieClip
 	{
 		if (!bFadedIn)
 			return true;
-
+			
 		var nextClip = pathToFocus.shift();
-
+			
 		if (nextClip.handleInput(details, pathToFocus))
 			return true;
-
+		
 		if (GlobalFunc.IsKeyPressed(details) && (details.navEquivalent == NavigationCode.TAB || details.navEquivalent == NavigationCode.SHIFT_TAB))
 			GameDelegate.call("CloseMenu",[]);
 
@@ -238,7 +239,6 @@ class ItemMenu extends MovieClip
 			aUpdateObj["currentArmorWarmth"] = selectedEntry.currentArmorWarmth;
 			aUpdateObj["currentArmorCoverage"] = selectedEntry.currentArmorCoverage;
 		}
-
 		bottomBar.UpdatePlayerInfo(aUpdateObj,itemCard.itemInfo);
 	}
 
@@ -253,7 +253,7 @@ class ItemMenu extends MovieClip
 			aUpdateObj["currentArmorWarmth"] = selectedEntry.currentArmorWarmth;
 			aUpdateObj["currentArmorCoverage"] = selectedEntry.currentArmorCoverage;
 		}
-
+		
 		itemCard.itemInfo = aUpdateObj;
 		bottomBar.updatePerItemInfo(aUpdateObj);
 	}
@@ -282,13 +282,13 @@ class ItemMenu extends MovieClip
 		inventoryLists.categoryList.disableSelection = false;
 		inventoryLists.categoryList.disableInput = false;
 	}
-
+	
 	// @API
 	public function RestoreIndices(): Void
 	{
 		var categoryList = inventoryLists.categoryList;
 		var itemList = inventoryLists.itemList;
-
+		
 		if (arguments[0] != undefined && arguments[0] != -1 && arguments.length == 5) {
 			categoryList.listState.restoredItem = arguments[0];
 			categoryList.onUnsuspend = function()
@@ -296,7 +296,7 @@ class ItemMenu extends MovieClip
 				this.onItemPress(this.listState.restoredItem, 0);
 				delete this.onUnsuspend;
 			};
-
+			
 			itemList.listState.restoredScrollPosition = arguments[2];
 			itemList.listState.restoredSelectedIndex = arguments[1];
 			itemList.listState.restoredActiveColumnIndex = arguments[3];
@@ -310,21 +310,20 @@ class ItemMenu extends MovieClip
 					this.selectedIndex = this.listState.restoredSelectedIndex;
 					delete this.onInvalidate;
 				};
-
+				
 				this.layout.restoreColumnState(this.listState.restoredActiveColumnIndex, this.listState.restoredActiveColumnState);
 				delete this.onUnsuspend;
 			};
 		} else {
-
+			
 			categoryList.onUnsuspend = function()
 			{
 				this.onItemPress(1, 0); // ALL
 				delete this.onUnsuspend;
 			};
 		}
-	}
-
-
+	}	
+	
   /* PRIVATE FUNCTIONS */
 
 	public function onItemCardSubMenuAction(event: Object): Void
@@ -341,7 +340,7 @@ class ItemMenu extends MovieClip
 			inventoryLists.categoryList.disableInput = false;
 		}
 	}
-
+	
 	private function onConfigLoad(event: Object): Void
 	{
 		setConfig(event.config);
@@ -392,24 +391,24 @@ class ItemMenu extends MovieClip
 			FetchChangeDataForList(inventoryLists.itemList.entryList, rangeMin, rangeMax);
 			_fetchedChangeRanges.push(range);
 		}
-
+		
 		if (event.index != -1) {
 			if (!_bItemCardFadedIn) {
 				_bItemCardFadedIn = true;
-
+				
 				if (_bItemCardPositioned)
 					itemCard.FadeInCard();
 			}
-
+			
 			if (_bItemCardPositioned)
 				GameDelegate.call("UpdateItem3D",[true]);
-
+				
 			GameDelegate.call("RequestItemCardInfo",[], this, "UpdateItemCardInfo");
-
+			
 		} else {
 			if (!bFadedIn)
 				resetMenu();
-
+			
 			if (_bItemCardFadedIn) {
 				_bItemCardFadedIn = false;
 				onHideItemsList();
@@ -470,39 +469,39 @@ class ItemMenu extends MovieClip
 	private function saveIndices(): Void
 	{
 		var a = new Array();
-
+		
 		// Save selected category, selected item and relative scroll position
 		a.push(inventoryLists.categoryList.selectedIndex);
 		a.push(inventoryLists.itemList.selectedIndex);
 		a.push(inventoryLists.itemList.scrollPosition);
 		a.push(inventoryLists.itemList.layout.activeColumnIndex);
 		a.push(inventoryLists.itemList.layout.activeColumnState);
-
+		
 		GameDelegate.call("SaveIndices", [a]);
 	}
-
+	
 	private function positionFixedElements(): Void
 	{
 		GlobalFunc.SetLockFunction();
-
+		
 		inventoryLists.Lock("L");
 		inventoryLists._x = inventoryLists._x - 20;
-
+		
 		var leftEdge = Stage.visibleRect.x + Stage.safeRect.x;
 		var rightEdge = Stage.visibleRect.x + Stage.visibleRect.width - Stage.safeRect.x;
-
+		
 		bottomBar.positionElements(leftEdge, rightEdge);
-
+		
 		MovieClip(exitMenuRect).Lock("TL");
 		exitMenuRect._x = exitMenuRect._x - Stage.safeRect.x;
 		exitMenuRect._y = exitMenuRect._y - Stage.safeRect.y;
 	}
-
+	
 	private function positionFloatingElements(): Void
 	{
 		var leftEdge = Stage.visibleRect.x + Stage.safeRect.x;
 		var rightEdge = Stage.visibleRect.x + Stage.visibleRect.width - Stage.safeRect.x;
-
+		
 		var a = inventoryLists.getContentBounds();
 		// 25 is hardcoded cause thats the final offset after the animation of the panel container is done
 		var panelEdge = inventoryLists._x + a[0] + a[2] + 25;
@@ -510,16 +509,16 @@ class ItemMenu extends MovieClip
 		var itemCardContainer = itemCard._parent;
 		var itemcardPosition = _config.ItemInfo.itemcard;
 		var itemiconPosition = _config.ItemInfo.itemicon;
-
+		
 		var scaleMult = (rightEdge - panelEdge) / itemCardContainer._width;
-
+		
 		// Scale down if necessary
 		if (scaleMult < 1.0) {
 			itemCardContainer._width *= scaleMult;
 			itemCardContainer._height *= scaleMult;
 			itemiconPosition.scale *= scaleMult;
 		}
-
+		
 		if (itemcardPosition.align == "left")
 			itemCardContainer._x = panelEdge + leftEdge + itemcardPosition.xOffset;
 		else if (itemcardPosition.align == "right")
@@ -535,16 +534,16 @@ class ItemMenu extends MovieClip
 			mouseRotationRect._width = itemCardContainer._width;
 			mouseRotationRect._height = 0.55 * Stage.visibleRect.height;
 		}
-
+			
 		_bItemCardPositioned = true;
-
+		
 		// Delayed fade in if positioned wasn't set
 		if (_bItemCardFadedIn) {
 			GameDelegate.call("UpdateItem3D",[true]);
 			itemCard.FadeInCard();
 		}
 	}
-
+	
 	private function shouldProcessItemsListInput(abCheckIfOverRect: Boolean): Boolean
 	{
 		var process = bFadedIn == true && inventoryLists.currentState == InventoryLists.SHOW_PANEL && inventoryLists.itemList.itemCount > 0 && !inventoryLists.itemList.disableSelection && !inventoryLists.itemList.disableInput;
@@ -552,33 +551,33 @@ class ItemMenu extends MovieClip
 		if (process && _platform == Shared.Platforms.CONTROLLER_PC && abCheckIfOverRect) {
 			var e = Mouse.getTopMostEntity();
 			var found = false;
-
+			
 			while (!found && e != undefined) {
 				if (e == inventoryLists.itemList)
 					found = true;
-
+					
 				e = e._parent;
 			}
-
+			
 			process = process && found;
 		}
 		return process;
 	}
-
+	
 	// Added to prevent clicks on the scrollbar from equipping/using stuff
 	private function confirmSelectedEntry(): Boolean
 	{
 		// only confirm when using mouse
 		if (_platform != 0)
 			return true;
-
+		
 		for (var e = Mouse.getTopMostEntity(); e != undefined; e = e._parent)
 			if (e.itemIndex == inventoryLists.itemList.selectedIndex)
 				return true;
-
+				
 		return false;
 	}
-
+	
 	/*
 		This method is only used for the InventoryMenu Favorites Category.
 		It prevents a lockup when unfavoriting the last item from favorites list by
@@ -608,19 +607,19 @@ class ItemMenu extends MovieClip
 
 		a_entryObject.flags |= Item.BOOKFLAG_READ;
 		a_entryObject.skyui_itemDataProcessed = false;
-
+		
 		inventoryLists.itemList.requestInvalidate();
 
 		return true;
 	}
-
+	
 	private function getEquipButtonData(a_itemType: Number, a_bAlwaysEquip: Boolean): Object
 	{
 		var btnData = {};
-
+		
 		var useControls = Input.Activate;
 		var equipControls = Input.Equip;
-
+		
 		switch (a_itemType) {
 			case Inventory.ICT_ARMOR :
 				btnData.text = "$Equip";
@@ -644,12 +643,12 @@ class ItemMenu extends MovieClip
 				btnData.text = "$Use";
 				btnData.controls = a_bAlwaysEquip ? equipControls : useControls;
 		}
-
+		
 		return btnData;
 	}
-
+	
 	private function updateBottomBar(a_bSelected: Boolean): Void {}
-
+	
 	//Frostfall
 	public function FetchProtectionDataForList(entryList: Array, rangeMin: Number, rangeMax: Number): Void
 	{
@@ -663,7 +662,7 @@ class ItemMenu extends MovieClip
 		};
 		//skse.Log("FormID: " + event.target.itemList.selectedEntry.formId);
 	}
-
+	
 	public function FetchChangeDataForList(entryList: Array, rangeMin: Number, rangeMax: Number): Void
 	{
 		for(var i = rangeMin; i <= rangeMax; i++) {
@@ -676,7 +675,7 @@ class ItemMenu extends MovieClip
 		};
 		//skse.Log("FormID: " + event.target.itemList.selectedEntry.formId);
 	}
-
+	
 	public function setEntryProtectionData(/* values */): Void
 	{
 		var index:Number = arguments[0];
@@ -702,7 +701,7 @@ class ItemMenu extends MovieClip
 		}
 		//skse.Log("Entry values are " + entry.warmth + " and " + entry.coverage);
 	}
-
+	
 	public function setEntryChangeData(/* values */): Void
 	{
 		var index:Number = arguments[0];
@@ -723,9 +722,9 @@ class ItemMenu extends MovieClip
 			}
 		}
 	}
-
+	
 	public function setEntryProtectionDataOnProcess(entryIndex: Number): Void
-	{
+	{		
 		//skse.Log("setEntryProtectionDataOnProcess")
 		itemCard.currentListIndex = entryIndex;
 		var range = Math.floor(entryIndex / 5);
@@ -738,9 +737,9 @@ class ItemMenu extends MovieClip
 			_fetchedRanges.push(range);
 		}
 	}
-
+	
 	public function setEntryChangeDataOnProcess(entryIndex: Number): Void
-	{
+	{		
 		itemCard.currentListIndex = entryIndex;
 		var range = Math.floor(entryIndex / 5);
 		//skse.Log("setEntryChangeDataOnProcess Current range is " + range);
@@ -752,25 +751,25 @@ class ItemMenu extends MovieClip
 			_fetchedChangeRanges.push(range);
 		}
 	}
-
+	
 	private function getEntryProtectionData(entryName: String, entryIndex: Number, formId: Number): Void
 	{
 		//skse.Log("sending " + entryIndex + " and " + formId);
 		skse.SendModEvent("Frost_OnSkyUIInvListGetEntryProtectionData", entryName, entryIndex, formId);
 	}
-
+	
 	private function getEntryChangeData(entryName: String, entryIndex: Number, formId: Number): Void
 	{
 		//skse.Log("sending " + entryIndex + " and " + formId);
 		skse.SendModEvent("Frost_OnSkyUIInvListGetEntryChangeData", entryName, entryIndex, formId);
 	}
-
+	
 	public function onFrostfallInvalidateFetchedRangesOnProcess(): Void
 	{
 		_fetchedRanges = [];
 		setEntryProtectionDataOnProcess(inventoryLists.itemList.selectedIndex);
 	}
-
+	
 	private function onFrostfallInvalidateChangeRanges(): Void
 	{
 		_fetchedChangeRanges = [];

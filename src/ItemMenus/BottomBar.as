@@ -126,12 +126,15 @@ class BottomBar extends MovieClip
 					var EF_HEALTH: Number = 0;
 					var EF_MAGICKA: Number = 1;
 					var EF_STAMINA: Number = 2;
-					if (a_itemUpdateObj.potionType == EF_MAGICKA) 
+					if (a_itemUpdateObj.potionType == EF_MAGICKA) {
 						infoCard.gotoAndStop("MagickaPotion");
-					else if (a_itemUpdateObj.potionType == EF_STAMINA) 
+					}
+					else if (a_itemUpdateObj.potionType == EF_STAMINA) {
 						infoCard.gotoAndStop("StaminaPotion");
-					else if (a_itemUpdateObj.potionType == EF_HEALTH) 
+					}
+					else if (a_itemUpdateObj.potionType == EF_HEALTH) {
 						infoCard.gotoAndStop("HealthPotion");
+					}
 					break;
 					
 				case Inventory.ICT_SPELL_DEFAULT:
