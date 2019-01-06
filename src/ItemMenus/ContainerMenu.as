@@ -270,14 +270,6 @@ class ContainerMenu extends ItemMenu
 		else if (!isViewingContainer())
 			startItemTransfer();
 	}
-
-	// @API
-	public function SetPlatform(a_platform: Number, a_bPS3Switch: Boolean): Void
-	{
-		super.SetPlatform(a_platform,a_bPS3Switch);
-
-		_bEquipMode = (a_platform != 0);
-	}
 	
 	
   /* PRIVATE FUNCTIONS */

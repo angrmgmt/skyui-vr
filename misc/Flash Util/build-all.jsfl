@@ -1,4 +1,4 @@
-﻿var srcDir = "file:///E:/skyui/src/"
+var srcDir = "file:///S:/Documents/GitHub/skyui-vr/src/"
 var flaFiles = [
 	"CraftingMenu/craftingmenu.fla",
 	//"FavoritesMenu/favoritesmenu.fla",
@@ -34,7 +34,7 @@ for(var i = 0; i < flaFiles.length; i++) {
 // Starting a new compile session
 // Clear out all errors
 fl.compilerErrors.clear();
-var logfile = "file:///E:/skyui/compile-error.txt";
+var logfile = "file:///S:/Documents/GitHub/skyui-vr/compile-error.txt";
 
 function build(documentUri) {
 	FLfile.remove(logfile);
