@@ -377,7 +377,6 @@ class BottomBar extends MovieClip
 		var strWarmth: String = _currentTotalWarmth.toString();
 		if (a_itemUpdateObj.currentArmorWarmth !== undefined) {
 			var iWarmthDelta = a_itemUpdateObj.warmth - a_itemUpdateObj.currentArmorWarmth;
-			skse.Log("BottomBar - a_itemUpdateObj.warmth is " + a_itemUpdateObj.warmth + ", a_itemUpdateObj.currentArmorWarmth is " + a_itemUpdateObj.currentArmorWarmth);
 			if (iWarmthDelta > 0) {
 				_lastWarmthDelta = " <font color=\'#189515\'>(+" + iWarmthDelta.toString() + ")</font>";
 				strWarmth = strWarmth + _lastWarmthDelta;
@@ -388,6 +387,8 @@ class BottomBar extends MovieClip
 			}
 			else {
 				_lastWarmthDelta = "";
+				skse.Log("BottomBar - a_itemUpdateObj.warmth is " + a_itemUpdateObj.warmth + ", a_itemUpdateObj.currentArmorWarmth is " + a_itemUpdateObj.currentArmorWarmth);
+				skse.Log("BottomBar - Warmth Delta is " + iWarmthDelta)
 			}
 		}
 		infoCard.ExposureProtectionValue.textAutoSize = "shrink";
@@ -397,7 +398,6 @@ class BottomBar extends MovieClip
 		var strCoverage: String = _currentTotalCoverage.toString();
 		if (a_itemUpdateObj.currentArmorCoverage !== undefined) {
 			var iCoverageDelta = a_itemUpdateObj.coverage - a_itemUpdateObj.currentArmorCoverage;
-			skse.Log("BottomBar - Coverage Delta is " + iCoverageDelta)
 			if (iCoverageDelta > 0) {
 				_lastCoverageDelta = " <font color=\'#189515\'>(+" + iCoverageDelta.toString() + ")</font>"
 				strCoverage = strCoverage + _lastCoverageDelta;
@@ -408,6 +408,8 @@ class BottomBar extends MovieClip
 			}
 			else {
 				_lastCoverageDelta = "";
+				skse.Log("BottomBar - a_itemUpdateObj.coverage is " + a_itemUpdateObj.coverage + ", a_itemUpdateObj.currentArmorCoverage is " + a_itemUpdateObj.currentArmorCoverage);
+				skse.Log("BottomBar - Coverage Delta is " + iCoverageDelta)
 			}
 		}
 		infoCard.RainProtectionValue.textAutoSize = "shrink";

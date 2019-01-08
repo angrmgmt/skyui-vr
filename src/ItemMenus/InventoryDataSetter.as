@@ -54,6 +54,7 @@ class InventoryDataSetter extends ItemcardDataExtender
 				processArmorBaseId(a_entryObject);
 				
 				//Frostfall
+				// _listProcessed is a superclass private variable, is consistently 'false' in-game
 				skse.Log("InventoryDataSetter - ListProcessed " + _listProcessed);
 				if (_listProcessed) {
 					skse.SendModEvent("Frost_OnSkyUIInvListGetEntryProtectionDataOnProcess", "", a_entryObject.itemIndex, 0);

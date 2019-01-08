@@ -643,7 +643,8 @@ class CraftingMenu extends MovieClip
 		}
 		
 		//Frostfall
-		FetchProtectionDataForList(event.target.itemList._entryList);
+		// This is a deprecated call, deferred to onItemHighlightChange() instead - huge memory leak otherwise
+		// FetchProtectionDataForList(event.target.itemList._entryList);
 		onItemHighlightChange(event);
 	}
 
