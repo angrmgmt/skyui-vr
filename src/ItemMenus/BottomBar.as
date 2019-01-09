@@ -373,17 +373,27 @@ class BottomBar extends MovieClip
 	public function updateFrostfallValues(a_itemUpdateObj: Object): Void
 	{
 		var infoCard = playerInfoCard;
+		var strWarmth: String = "";  // init to empty string to support changes below
+		var strCoverage: String = "";
 
-		var strWarmth: String = _currentTotalWarmth.toString();
+		// Shouldn't need this, but for some reason 'undefined' is getting through
+		if (_currentTotalWarmth !== undefined  && _lastWarmthDelta !== undefined) {
+			strWarmth = _currentTotalWarmth.toString();
+		}
+
 		if (a_itemUpdateObj.currentArmorWarmth !== undefined) {
 			var iWarmthDelta = a_itemUpdateObj.warmth - a_itemUpdateObj.currentArmorWarmth;
 			if (iWarmthDelta > 0) {
 				_lastWarmthDelta = " <font color=\'#189515\'>(+" + iWarmthDelta.toString() + ")</font>";
-				strWarmth = strWarmth + _lastWarmthDelta;
+				if (_lastWarmthDelta !== undefined) {
+					strWarmth = strWarmth + _lastWarmthDelta;
+				}
 			}
 			else if (iWarmthDelta < 0) {
 				_lastWarmthDelta = " <font color=\'#FF0000\'>(" + iWarmthDelta.toString() + ")</font>";
-				strWarmth = strWarmth + _lastWarmthDelta;
+				if (_lastWarmthDelta !== undefined) {
+					strWarmth = strWarmth + _lastWarmthDelta;
+				}
 			}
 			else {
 				_lastWarmthDelta = "";
@@ -395,16 +405,24 @@ class BottomBar extends MovieClip
 		infoCard.ExposureProtectionValue.html = true;
 		infoCard.ExposureProtectionValue.SetText(strWarmth, true);
 
-		var strCoverage: String = _currentTotalCoverage.toString();
+		// Shouldn't need this, but for some reason 'undefined' is getting through
+		if (_currentTotalWarmth !== undefined && _lastCoverageDelta !== undefined) {
+			strCoverage = _currentTotalCoverage.toString();
+		}
+
 		if (a_itemUpdateObj.currentArmorCoverage !== undefined) {
 			var iCoverageDelta = a_itemUpdateObj.coverage - a_itemUpdateObj.currentArmorCoverage;
 			if (iCoverageDelta > 0) {
 				_lastCoverageDelta = " <font color=\'#189515\'>(+" + iCoverageDelta.toString() + ")</font>"
-				strCoverage = strCoverage + _lastCoverageDelta;
+				if (_lastCoverageDelta !== undefined) {
+					strCoverage = strCoverage + _lastCoverageDelta;
+				}
 			}
 			else if (iCoverageDelta < 0) {
 				_lastCoverageDelta = " <font color=\'#FF0000\'>(" + iCoverageDelta.toString() + ")</font>"
-				strCoverage = strCoverage + _lastCoverageDelta;
+				if (_lastCoverageDelta !== undefined) {
+					strCoverage = strCoverage + _lastCoverageDelta;
+				}
 			}
 			else {
 				_lastCoverageDelta = "";
@@ -417,21 +435,40 @@ class BottomBar extends MovieClip
 		infoCard.RainProtectionValue.SetText(strCoverage, true);
 	}
 
+	// possible culprit of '0undefined' (coverage value + undefined) showing in BottomBar
 	private function updateFrostfallWarmthFromStoredValues(): Void
 	{
 		var infoCard = playerInfoCard;
-		var strWarmth: String = _currentTotalWarmth.toString();
-		strWarmth = strWarmth + _lastWarmthDelta;
+		var strWarmth: String = "";
+		
+		if (_currentTotalWarmth !== undefined  && _lastWarmthDelta !== undefined) {
+			strWarmth = _currentTotalWarmth.toString();
+		}
+
+		// Shouldn't need this but 'undefined' is getting through somehow
+		if (_lastWarmthDelta !== undefined) {
+			strWarmth = strWarmth + _lastWarmthDelta;
+		}
+
 		infoCard.ExposureProtectionValue.textAutoSize = "shrink";
 		infoCard.ExposureProtectionValue.html = true;
 		infoCard.ExposureProtectionValue.SetText(strWarmth, true);
 	}
 
+	// possible culprit of '0undefined' (coverage value + undefined) showing in BottomBar
 	private function updateFrostfallCoverageFromStoredValues(): Void
 	{
 		var infoCard = playerInfoCard;		
-		var strCoverage: String = _currentTotalCoverage.toString();
-		strCoverage = strCoverage + _lastCoverageDelta;
+		var strCoverage: String = "";
+
+		if (_currentTotalWarmth !== undefined && _lastCoverageDelta !== undefined) {
+			strCoverage = _currentTotalCoverage.toString();
+		}
+
+		// Shouldn't need this but 'undefined' is getting through somehow
+		if (_lastCoverageDelta !== undefined) {
+			strCoverage = strCoverage + _lastCoverageDelta;
+		}
 		infoCard.RainProtectionValue.textAutoSize = "shrink";
 		infoCard.RainProtectionValue.html = true;
 		infoCard.RainProtectionValue.SetText(strCoverage, true);

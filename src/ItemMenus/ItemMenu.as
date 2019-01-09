@@ -718,6 +718,7 @@ class ItemMenu extends MovieClip
 		if (selectedEntry.formType === 26) {
 			var selectedIdx:Number = selectedEntry.itemIndex;
 			var entryFromSelected = inventoryLists.itemList.entryList[selectedIdx];
+
 			if (entryFromSelected["currentArmorWarmth"] !== undefined && entryFromSelected["currentArmorCoverage"] !== undefined) {
 				bottomBar.updateFrostfallValues(selectedEntry);
 				bottomBar.updateFrostfallElementPositions();
