@@ -618,9 +618,9 @@ class CraftingMenu extends MovieClip
 		//Frostfall
 		ItemInfo.currentListIndex = event.index;
 		var range = Math.floor(event.index / 5);
-		skse.Log("CraftingMenu - Current range is " + range);
+		// skse.Log("CraftingMenu - Current range is " + range);
 		if (_fetchedRanges.indexOf(range) === -1 || _fetchedRanges.indexOf(range) === undefined) {
-			skse.Log("CraftingMenu - Need to fetch range " + range);
+			// skse.Log("CraftingMenu - Need to fetch range " + range);
 			var rangeMin = range * 5;
 			var rangeMax = (range * 5) + 4;
 			FetchProtectionDataForList(event.target.itemList._entryList, rangeMin, rangeMax);
@@ -759,9 +759,9 @@ class CraftingMenu extends MovieClip
 	public function FetchProtectionDataForList(entryList: Array, rangeMin: Number, rangeMax: Number): Void
 	{
 		for(var i = rangeMin; i <= rangeMax; i++) {
-			skse.Log("CraftingMenu - " + i + " : " + entryList[i]);
+			// skse.Log("CraftingMenu - " + i + " : " + entryList[i]);
 			var entry = entryList[i];
-			skse.Log("CraftingMenu - " + i + " : " + entry.formId);
+			// skse.Log("CraftingMenu - " + i + " : " + entry.formId);
 			if (entry.formType === 26) {
 				getEntryProtectionData(entry.text, i, Number(entry.formId));
 			};
@@ -775,7 +775,7 @@ class CraftingMenu extends MovieClip
 		var index:Number = arguments[0];
 		var warmth:Number = arguments[1];
 		var coverage:Number = arguments[2];
-		skse.Log("CraftingMenu - Receiving idx " + index + ", warmth " + warmth + ", coverage " + coverage);
+		// skse.Log("CraftingMenu - Receiving idx " + index + ", warmth " + warmth + ", coverage " + coverage);
 		var entry = ItemList.entryList[index];
 		entry["warmth"] = warmth;
 		entry["coverage"] = coverage;
@@ -788,17 +788,17 @@ class CraftingMenu extends MovieClip
 				ItemInfo.ForceProtectionDisplay(entryFromSelected.warmth, entryFromSelected.coverage);
 			}
 		}
-		skse.Log("CraftingMenu - Entry values are " + entry.warmth + " and " + entry.coverage);
+		// skse.Log("CraftingMenu - Entry values are " + entry.warmth + " and " + entry.coverage);
 	}
 	
 	public function setEntryProtectionDataOnProcess(entryIndex: Number): Void
 	{
-		skse.Log("CraftingMenu - setEntryProtectionDataOnProcess")
+		// skse.Log("CraftingMenu - setEntryProtectionDataOnProcess")
 		ItemInfo.currentListIndex = entryIndex;
 		var range = Math.floor(entryIndex / 5);
-		skse.Log("CraftingMenu - Current range is " + range);
+		// skse.Log("CraftingMenu - Current range is " + range);
 		if (_fetchedRanges.indexOf(range) === -1 || _fetchedRanges.indexOf(range) === undefined) {
-			skse.Log("CraftingMenu - Need to fetch range " + range);
+			// skse.Log("CraftingMenu - Need to fetch range " + range);
 			var rangeMin = range * 5;
 			var rangeMax = (range * 5) + 4;
 			FetchProtectionDataForList(ItemList.entryList, rangeMin, rangeMax);
@@ -808,7 +808,7 @@ class CraftingMenu extends MovieClip
 	
 	private function getEntryProtectionData(entryName: String, entryIndex: Number, formId: Number) 
 	{
-		skse.Log("CraftingMenu - sending " + entryIndex + " and " + formId);
+		// skse.Log("CraftingMenu - sending " + entryIndex + " and " + formId);
 		skse.SendModEvent("Frost_OnSkyUIInvListGetEntryProtectionData", entryName, entryIndex, formId);
 	}
 	

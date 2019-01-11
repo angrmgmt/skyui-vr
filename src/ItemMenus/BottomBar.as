@@ -397,8 +397,8 @@ class BottomBar extends MovieClip
 			}
 			else {
 				_lastWarmthDelta = "";
-				skse.Log("BottomBar - a_itemUpdateObj.warmth is " + a_itemUpdateObj.warmth + ", a_itemUpdateObj.currentArmorWarmth is " + a_itemUpdateObj.currentArmorWarmth);
-				skse.Log("BottomBar - Warmth Delta is " + iWarmthDelta)
+				// skse.Log("BottomBar - a_itemUpdateObj.warmth is " + a_itemUpdateObj.warmth + ", a_itemUpdateObj.currentArmorWarmth is " + a_itemUpdateObj.currentArmorWarmth);
+				// skse.Log("BottomBar - Warmth Delta is " + iWarmthDelta)
 			}
 		}
 		infoCard.ExposureProtectionValue.textAutoSize = "shrink";
@@ -426,8 +426,8 @@ class BottomBar extends MovieClip
 			}
 			else {
 				_lastCoverageDelta = "";
-				skse.Log("BottomBar - a_itemUpdateObj.coverage is " + a_itemUpdateObj.coverage + ", a_itemUpdateObj.currentArmorCoverage is " + a_itemUpdateObj.currentArmorCoverage);
-				skse.Log("BottomBar - Coverage Delta is " + iCoverageDelta)
+				// skse.Log("BottomBar - a_itemUpdateObj.coverage is " + a_itemUpdateObj.coverage + ", a_itemUpdateObj.currentArmorCoverage is " + a_itemUpdateObj.currentArmorCoverage);
+				// skse.Log("BottomBar - Coverage Delta is " + iCoverageDelta)
 			}
 		}
 		infoCard.RainProtectionValue.textAutoSize = "shrink";
